@@ -1,0 +1,18 @@
+﻿# Virtual environment
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Environment / secrets
+.env
+
+# Real CVs contain personal data, never commit them
+data/raw/
+
+# Editor
+.vscode/
+.DS_Store
