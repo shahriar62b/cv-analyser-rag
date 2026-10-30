@@ -1,13 +1,7 @@
 ﻿# CV Analyser
 
 A RAG-based tool that compares a CV (PDF/DOCX) against a job description,
-flags weaknesses, suggests improvements, and gives an overall verdict.
+flags weaknesses, suggests improvements, and gives a verdict.
 
 ## Status
-Early development. Project scaffold only.
-
-## Planned scope
-- CV parsing (PDF/DOCX)
-- Job description ingestion
-- Retrieval + LLM analysis
-- Weakness report and verdict
+Work in progress. Currently building the ingestion layer.

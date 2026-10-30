@@ -1,18 +1,18 @@
-﻿# Virtual environment
-.venv/
-venv/
-
-# Python
+﻿# Python
 __pycache__/
 *.pyc
+.venv/
+venv/
+env/
 .pytest_cache/
+*.egg-info/
 
-# Environment / secrets
+# Secrets and local config
 .env
-
-# Real CVs contain personal data, never commit them
-data/raw/
 
 # Editor
 .vscode/
-.DS_Store
+
+# Real CVs contain personal data, so never commit them
+data/samples/*
+!data/samples/.gitkeep
