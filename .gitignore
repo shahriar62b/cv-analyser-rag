@@ -16,3 +16,6 @@ env/
 # Real CVs contain personal data, so never commit them
 data/samples/*
 !data/samples/.gitkeep
+
+data/*
+!data/README.md
