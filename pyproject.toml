@@ -1,2 +1,4 @@
    [tool.pytest.ini_options]
-   pythonpath = ["src"]
+pythonpath = ["src"]
+addopts = "-m 'not slow'"
+markers = ["slow: tests that load the real embedding model (run with: pytest -m slow)"]
