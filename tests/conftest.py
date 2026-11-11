@@ -22,3 +22,22 @@ class _FakeEmbedder:
 @pytest.fixture
 def fake_embedder() -> _FakeEmbedder:
     return _FakeEmbedder()
+
+
+class _FakeLLM:
+    """Returns pre-set answers in order and records every call it receives."""
+
+    def __init__(self, responses: list[dict]) -> None:
+        self._responses = list(responses)
+        self.calls: list[tuple[str, str, type]] = []
+
+    def generate_structured(self, system, user, schema):
+        self.calls.append((system, user, schema))
+        if not self._responses:
+            raise AssertionError("FakeLLM received more calls than it has responses")
+        return schema.model_validate(self._responses.pop(0))
+
+
+@pytest.fixture
+def make_fake_llm():
+    return _FakeLLM
