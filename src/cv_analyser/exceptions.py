@@ -12,3 +12,7 @@ class CorruptedFileError(CVAnalyserError):
 
 class EmptyDocumentError(CVAnalyserError):
     """The file opened but no extractable text was found (e.g. scanned PDF)."""
+
+
+class LLMError(CVAnalyserError):
+    """The LLM could not be reached or returned output we cannot use."""
