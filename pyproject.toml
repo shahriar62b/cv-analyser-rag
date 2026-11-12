@@ -1,4 +1,30 @@
-   [tool.pytest.ini_options]
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cv-analyser"
+version = "0.1.0"
+description = "RAG-based CV vs job description analyser that runs on free, local models"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=2.0",
+    "pdfplumber>=0.11",
+    "pydantic>=2.0",
+    "python-docx>=1.1",
+    "sentence-transformers>=3.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
 pythonpath = ["src"]
-addopts = "-m 'not slow'"
-markers = ["slow: tests that load the real embedding model (run with: pytest -m slow)"]
+addopts = "-m 'not slow and not ollama'"
+markers = [
+    "slow: tests that load the real embedding model (run with: pytest -m slow)",
+    "ollama: tests that call a running local Ollama server (run with: pytest -m ollama)",
+]
