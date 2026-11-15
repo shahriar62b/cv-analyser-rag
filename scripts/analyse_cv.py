@@ -70,7 +70,10 @@ def main() -> int:
 def print_verdicts(verdicts: list[RequirementVerdict]) -> None:
     """Print verdicts as each batch finishes, before the full report is ready."""
     for verdict in verdicts:
-        kind = "must" if verdict.requirement.must_have else "nice"
+        if verdict.requirement.mandatory:
+            kind = "MANDATORY"
+        else:
+            kind = "must" if verdict.requirement.must_have else "nice"
         flag = "" if verdict.evidence_verified else "  (evidence not found in CV)"
         print(f"{_STATUS_ICON[verdict.status]} ({kind}) {verdict.requirement.text}{flag}")
         if verdict.evidence:
@@ -80,6 +83,8 @@ def print_verdicts(verdicts: list[RequirementVerdict]) -> None:
 
 def print_report(report: CVReport) -> None:
     print(f"\n=== Match score: {report.overall_score}/100 ===")
+    for verdict in report.unmet_mandatory:
+        print(f"!! Mandatory requirement not met ({verdict.status}): {verdict.requirement.text}")
     summary = report.summary
     for title, items in (
         ("Strengths", summary.strengths),

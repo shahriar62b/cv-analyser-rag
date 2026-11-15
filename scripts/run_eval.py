@@ -93,7 +93,10 @@ def main() -> int:
 
 def _run_labelled(pair, llm, retriever, cv_text, jd_text, embedder, check_extraction):
     rows = pair["requirements"]
-    requirements = [Requirement(text=r["text"], must_have=r["must_have"]) for r in rows]
+    requirements = [
+        Requirement(text=r["text"], must_have=r["must_have"], mandatory=r.get("mandatory", False))
+        for r in rows
+    ]
     verdicts = judge_requirements(llm, retriever, cv_text, requirements)
 
     graded = []
@@ -138,10 +141,13 @@ def _check_extraction(llm, embedder, jd_text, rows):
     extracted = extract_requirements_llm(llm, jd_text)
     key_texts = [r["text"] for r in rows]
     found_texts = [r.text for r in extracted]
+    if not found_texts:
+        return {"extracted": 0, "key": len(key_texts), "covered": 0, "matches": []}
     similarity = embedder.embed(key_texts) @ embedder.embed(found_texts).T
     best = similarity.argmax(axis=1)
     matches = [
-        {"key": key, "closest": found_texts[j], "similarity": round(float(similarity[i, j]), 2)}
+        {"key": key, "closest": found_texts[j], "similarity": round(float(similarity[i, j]), 2),
+         "key_mandatory": rows[i].get("mandatory", False), "found_mandatory": extracted[j].mandatory}
         for i, (key, j) in enumerate(zip(key_texts, best))
     ]
     covered = sum(m["similarity"] >= COVERAGE_THRESHOLD for m in matches)
@@ -168,6 +174,9 @@ def _summarise(results, seconds, llm):
         "negatives_passed": f"{sum(r['passed'] for r in negatives)}/{len(negatives)}",
         "extraction_coverage": _pct(sum(e["covered"] for e in extraction),
                                     sum(e["key"] for e in extraction)) if extraction else None,
+        # Mandatory flags: how many the key marks, how many extraction caught,
+        # and how many it added where the key has none.
+        "mandatory_flags": _mandatory_flags(extraction),
         "total_seconds": round(seconds),
     }
     if hasattr(llm, "usage"):
@@ -182,6 +191,15 @@ def _summarise(results, seconds, llm):
             "output_seconds": round(usage.output_seconds),
         }
     return summary
+
+
+def _mandatory_flags(extraction):
+    matches = [m for e in extraction for m in e["matches"]]
+    return {
+        "in_key": sum(m["key_mandatory"] for m in matches),
+        "caught": sum(m["key_mandatory"] and m["found_mandatory"] for m in matches),
+        "false_flags": sum(m["found_mandatory"] and not m["key_mandatory"] for m in matches),
+    }
 
 
 def _pct(part, whole):

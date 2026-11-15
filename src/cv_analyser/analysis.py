@@ -28,6 +28,9 @@ experience, education, certifications and languages.
 Rules:
 - One requirement per item, short and specific (e.g. "3+ years of Python").
 - Set must_have to false only when the text marks it as optional, preferred, a plus or nice to have.
+- Set mandatory to true only when the text explicitly calls the requirement mandatory,
+  compulsory, essential or non-negotiable. Words like "required" or "must have" alone
+  do not make it mandatory.
 - Skip company descriptions, benefits, salary and application instructions."""
 
 JUDGE_SYSTEM = """You check whether a CV meets job requirements, using only the CV excerpts given.
@@ -181,10 +184,22 @@ def summarise(llm: LLMClient, verdicts: list[RequirementVerdict], score: int) ->
         f"Match score: {score}/100\n"
         f"{_count_line('Must-have', verdicts, must_have=True)}\n"
         f"{_count_line('Nice-to-have', verdicts, must_have=False)}\n"
-        "The verdict must agree with these counts.\n\n"
+        "The verdict must agree with these counts.\n"
+        f"{_mandatory_line(verdicts)}\n"
         "Requirement results:\n" + "\n".join(lines)
     )
     return llm.generate_structured(SUMMARY_SYSTEM, user, CVSummary)
+
+
+def _mandatory_line(verdicts: list[RequirementVerdict]) -> str:
+    unmet = [v.requirement.text for v in verdicts if v.requirement.mandatory and v.status != "met"]
+    if not unmet:
+        return ""
+    return (
+        "Mandatory requirements not met: " + "; ".join(unmet) + ". The job says these are "
+        "mandatory, so the verdict must say the candidate will likely be rejected unless "
+        "they can show them.\n"
+    )
 
 
 def _count_line(label: str, verdicts: list[RequirementVerdict], must_have: bool) -> str:

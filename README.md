@@ -63,6 +63,8 @@ How it works:
 4. Every quote is checked against the CV text; unverified quotes earn half credit.
 5. The score is computed in code: must-haves count double, partial counts half.
 6. The LLM writes strengths, gaps, suggestions and a verdict.
+7. Requirements the job explicitly calls mandatory are flagged when the CV does not
+   meet them. The score is not changed, but the report and verdict warn about them.
 
 Verdicts are printed as each batch finishes, so the first results appear before
 the whole analysis is done. Requirements extracted from a job description are

@@ -249,3 +249,31 @@ def test_given_requirements_skip_extraction(make_fake_llm, fake_embedder):
     assert len(llm.calls) == 2
     assert report.verdicts[0].requirement.text == "Go"
     assert not any(m.startswith("Extracting") for m in messages)
+
+
+def test_unmet_mandatory_is_flagged_without_changing_the_score(make_fake_llm, fake_embedder):
+    llm = make_fake_llm(
+        [
+            {"requirements": [{"text": "Python APIs", "must_have": True},
+                              {"text": "Inditex buyers", "must_have": True, "mandatory": True}]},
+            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"),
+                            _judgement(2, "missing")]},
+            SUMMARY,
+        ]
+    )
+
+    report = analyse_cv(CV_TEXT, "job text", llm, fake_embedder)
+
+    assert report.overall_score == 50
+    assert [v.requirement.text for v in report.unmet_mandatory] == ["Inditex buyers"]
+    assert "Mandatory requirements not met: Inditex buyers" in llm.calls[2][1]
+
+
+def test_summary_prompt_has_no_mandatory_line_when_all_are_met(make_fake_llm):
+    llm = make_fake_llm([SUMMARY])
+    verdict = _verdict("met")
+    verdict.requirement.mandatory = True
+
+    summarise(llm, [verdict], score=100)
+
+    assert "Mandatory" not in llm.calls[0][1]
