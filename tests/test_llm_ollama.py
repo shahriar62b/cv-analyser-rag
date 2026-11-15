@@ -97,3 +97,23 @@ def test_timeout_raises(capture):
 
     with pytest.raises(LLMError, match="did not answer"):
         OllamaClient(timeout=5).generate_structured("sys", "user", _Answer)
+
+
+def test_usage_adds_up_timing_fields_across_calls(capture):
+    capture["reply"] = {
+        "message": {"content": '{"skill": "Python", "years": 3}'},
+        "prompt_eval_count": 100,
+        "eval_count": 20,
+        "load_duration": 2_000_000_000,
+        "prompt_eval_duration": 1_000_000_000,
+        "eval_duration": 4_000_000_000,
+    }
+    client = OllamaClient()
+    client.generate_structured("sys", "user", _Answer)
+    client.generate_structured("sys", "user", _Answer)
+
+    assert client.usage.calls == 2
+    assert client.usage.prompt_tokens == 200
+    assert client.usage.output_tokens == 40
+    assert client.usage.load_seconds == pytest.approx(4.0)
+    assert client.usage.output_seconds == pytest.approx(8.0)

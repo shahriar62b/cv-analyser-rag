@@ -1,6 +1,7 @@
 import json
 import urllib.error
 import urllib.request
+from dataclasses import dataclass
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -11,6 +12,27 @@ T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_MODEL = "qwen2.5:7b"
 DEFAULT_URL = "http://localhost:11434"
+_NS = 1e9
+
+
+@dataclass
+class Usage:
+    """Running totals from Ollama's own timing fields, for measuring speed."""
+
+    calls: int = 0
+    prompt_tokens: int = 0
+    output_tokens: int = 0
+    load_seconds: float = 0.0
+    prompt_seconds: float = 0.0
+    output_seconds: float = 0.0
+
+    def add(self, body: dict[str, Any]) -> None:
+        self.calls += 1
+        self.prompt_tokens += body.get("prompt_eval_count", 0)
+        self.output_tokens += body.get("eval_count", 0)
+        self.load_seconds += body.get("load_duration", 0) / _NS
+        self.prompt_seconds += body.get("prompt_eval_duration", 0) / _NS
+        self.output_seconds += body.get("eval_duration", 0) / _NS
 
 
 class OllamaClient:
@@ -29,6 +51,7 @@ class OllamaClient:
         # Ollama's default context is small and it silently drops whatever
         # does not fit, which would cut off part of the CV.
         self._context_tokens = context_tokens
+        self.usage = Usage()
 
     @property
     def model(self) -> str:
@@ -49,6 +72,7 @@ class OllamaClient:
                 "options": {"temperature": 0, "num_ctx": self._context_tokens},
             },
         )
+        self.usage.add(body)
         content = (body.get("message") or {}).get("content")
         if not content:
             raise LLMError(f"Ollama returned no content for model '{self._model}'")
