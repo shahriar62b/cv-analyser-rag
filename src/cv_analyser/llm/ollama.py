@@ -9,7 +9,7 @@ from cv_analyser.exceptions import LLMError
 
 T = TypeVar("T", bound=BaseModel)
 
-DEFAULT_MODEL = "qwen2.5:3b"
+DEFAULT_MODEL = "qwen2.5:7b"
 DEFAULT_URL = "http://localhost:11434"
 
 
