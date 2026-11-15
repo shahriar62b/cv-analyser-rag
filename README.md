@@ -64,8 +64,26 @@ How it works:
 5. The score is computed in code: must-haves count double, partial counts half.
 6. The LLM writes strengths, gaps, suggestions and a verdict.
 
-On a CPU-only laptop with `qwen2.5:7b`, a job with about 10 requirements takes
-8-10 minutes (2-3 minutes with `qwen2.5:3b`).
+Verdicts are printed as each batch finishes, so the first results appear before
+the whole analysis is done. Requirements extracted from a job description are
+saved in `data/cache/requirements/`, so checking another CV against the same job
+skips extraction (`--no-cache` turns this off). Ollama keeps the model in memory
+for 30 minutes after each request, so only the first run pays the loading time.
+
+On a CPU-only laptop with `qwen2.5:7b`, a job with about 7 requirements took
+about 5 minutes from a cold start, most of it spent writing the answers.
+
+## Evaluation
+
+`scripts/run_eval.py` compares the judge with a hand-labelled answer key of
+fictional CVs and real job descriptions (kept out of git under `data/eval/`).
+It reports strict and lenient accuracy, "met" claims for missing requirements,
+unverified evidence, score error, extraction coverage and speed.
+
+```bash
+python scripts/run_eval.py --out data/eval/results/run.json
+python scripts/run_eval.py --pairs cv_a --no-extraction   # quick subset
+```
 
 ## Tests
 

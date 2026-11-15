@@ -44,6 +44,7 @@ class OllamaClient:
         base_url: str = DEFAULT_URL,
         timeout: float = 600.0,
         context_tokens: int = 8192,
+        keep_alive: str = "30m",
     ) -> None:
         self._model = model
         self._base_url = base_url.rstrip("/")
@@ -51,6 +52,9 @@ class OllamaClient:
         # Ollama's default context is small and it silently drops whatever
         # does not fit, which would cut off part of the CV.
         self._context_tokens = context_tokens
+        # Loading the 7B model takes about a minute on a CPU-only laptop, so keep
+        # it in memory between requests instead of Ollama's default 5 minutes.
+        self._keep_alive = keep_alive
         self.usage = Usage()
 
     @property
@@ -69,6 +73,7 @@ class OllamaClient:
                 # Passing the JSON schema makes Ollama constrain the output to it.
                 "format": schema.model_json_schema(),
                 "stream": False,
+                "keep_alive": self._keep_alive,
                 "options": {"temperature": 0, "num_ctx": self._context_tokens},
             },
         )

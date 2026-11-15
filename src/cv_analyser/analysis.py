@@ -18,6 +18,9 @@ from cv_analyser.retriever import CVRetriever
 from cv_analyser.sections import split_into_sections
 
 Progress = Callable[[str], None]
+# Receives each batch of verdicts as soon as it is judged, so a caller can show
+# results while the rest are still being worked on.
+VerdictSink = Callable[[list[RequirementVerdict]], None]
 
 EXTRACT_SYSTEM = """You extract hiring requirements from a job description.
 Return every distinct requirement a candidate must or should meet: skills, tools,
@@ -81,16 +84,23 @@ def analyse_cv(
     llm: LLMClient,
     embedder: Embedder,
     progress: Progress | None = None,
+    requirements: list[Requirement] | None = None,
+    on_verdicts: VerdictSink | None = None,
 ) -> CVReport:
+    """Pass `requirements` to reuse an earlier extraction of the same job
+    description; extraction is then skipped."""
     report_progress = progress or (lambda message: None)
 
     retriever = CVRetriever(embedder)
     retriever.index(chunk_sections(split_into_sections(cv_text)))
 
-    report_progress("Extracting requirements from the job description")
-    requirements = extract_requirements_llm(llm, job_description)
+    if requirements is None:
+        report_progress("Extracting requirements from the job description")
+        requirements = extract_requirements_llm(llm, job_description)
 
-    verdicts = judge_requirements(llm, retriever, cv_text, requirements, progress=report_progress)
+    verdicts = judge_requirements(
+        llm, retriever, cv_text, requirements, progress=report_progress, on_verdicts=on_verdicts
+    )
 
     report_progress("Writing the summary")
     score = compute_score(verdicts)
@@ -114,22 +124,31 @@ def judge_requirements(
     batch_size: int = 5,
     top_k: int = 2,
     progress: Progress | None = None,
+    on_verdicts: VerdictSink | None = None,
 ) -> list[RequirementVerdict]:
     if batch_size <= 0:
         raise ValueError("batch_size must be positive")
 
     judgements: dict[int, _Judgement] = {}
+
+    def run_batch(numbers: list[int]) -> None:
+        found = _judge_batch(llm, retriever, requirements, numbers, top_k)
+        judgements.update(found)
+        if on_verdicts and found:
+            on_verdicts([
+                _to_verdict(requirements[n - 1], found[n], cv_text) for n in sorted(found)
+            ])
+
     total_batches = -(-len(requirements) // batch_size)
     for start in range(0, len(requirements), batch_size):
         if progress:
             progress(f"Judging requirements (batch {start // batch_size + 1} of {total_batches})")
-        numbers = list(range(start + 1, min(start + batch_size, len(requirements)) + 1))
-        judgements |= _judge_batch(llm, retriever, requirements, numbers, top_k)
+        run_batch(list(range(start + 1, min(start + batch_size, len(requirements)) + 1)))
 
     # Small models sometimes skip an item; give those one more try on their own.
     skipped = [n for n in range(1, len(requirements) + 1) if n not in judgements]
     if skipped:
-        judgements |= _judge_batch(llm, retriever, requirements, skipped, top_k)
+        run_batch(skipped)
 
     return [
         _to_verdict(requirement, judgements.get(number), cv_text)

@@ -214,3 +214,38 @@ def test_missing_verdict_hides_unrelated_quote(make_fake_llm, retriever):
     [verdict] = judge_requirements(llm, retriever, CV_TEXT, [Requirement(text="Kafka")])
 
     assert verdict.evidence == ""
+
+
+def test_verdicts_are_streamed_per_batch(make_fake_llm, retriever):
+    requirements = [Requirement(text=t) for t in ("Python APIs", "PostgreSQL", "Kubernetes")]
+    llm = make_fake_llm(
+        [
+            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"), _judgement(2, "missing")]},
+            {"judgements": [_judgement(3, "missing")]},
+        ]
+    )
+    batches = []
+
+    verdicts = judge_requirements(
+        llm, retriever, CV_TEXT, requirements, batch_size=2, on_verdicts=batches.append
+    )
+
+    assert [[v.requirement.text for v in batch] for batch in batches] == [
+        ["Python APIs", "PostgreSQL"],
+        ["Kubernetes"],
+    ]
+    assert batches[0][0] == verdicts[0]
+
+
+def test_given_requirements_skip_extraction(make_fake_llm, fake_embedder):
+    llm = make_fake_llm([{"judgements": [_judgement(1, "missing")]}, SUMMARY])
+    messages = []
+
+    report = analyse_cv(
+        CV_TEXT, "job text", llm, fake_embedder,
+        progress=messages.append, requirements=[Requirement(text="Go")],
+    )
+
+    assert len(llm.calls) == 2
+    assert report.verdicts[0].requirement.text == "Go"
+    assert not any(m.startswith("Extracting") for m in messages)

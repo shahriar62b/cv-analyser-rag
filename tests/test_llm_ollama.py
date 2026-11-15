@@ -54,6 +54,7 @@ def test_sends_schema_messages_and_options(capture):
     assert capture["url"] == "http://host:1234/api/chat"
     assert payload["model"] == "tiny"
     assert payload["stream"] is False
+    assert payload["keep_alive"] == "30m"
     assert payload["format"] == _Answer.model_json_schema()
     assert payload["messages"] == [
         {"role": "system", "content": "be strict"},
