@@ -12,7 +12,8 @@ Work in progress.
 - [x] Ingestion: load PDF/DOCX, clean text, split into sections and chunks
 - [x] Retrieval: embed chunks and find CV evidence for each JD requirement
 - [x] LLM layer: provider-agnostic client with a local Ollama backend
-- [ ] Analysis: LLM judges each requirement and writes the final report
+- [x] Analysis: LLM extracts requirements, judges each against CV evidence,
+      and writes the final report
 
 ## Setup
 
@@ -25,9 +26,9 @@ pip install -r requirements.txt
 ### Local LLM (free)
 
 1. Install Ollama from https://ollama.com/download and make sure it is running.
-2. Pull the default model (about 2 GB):
+2. Pull the default model (about 4.7 GB):
    ```bash
-   ollama pull qwen2.5:3b
+   ollama pull qwen2.5:7b
    ```
 3. Check that the project can talk to it:
    ```bash
@@ -39,11 +40,32 @@ Configuration is read from environment variables:
 | Variable       | Default                  | Meaning                         |
 |----------------|--------------------------|---------------------------------|
 | `LLM_PROVIDER` | `ollama`                 | Which LLM backend to use        |
-| `LLM_MODEL`    | `qwen2.5:3b`             | Model name for that backend     |
+| `LLM_MODEL`    | `qwen2.5:7b`             | Model name for that backend     |
 | `OLLAMA_URL`   | `http://localhost:11434` | Address of the Ollama server    |
 
-A 3B model is a good fit for a CPU-only laptop with 16 GB RAM. With more
-power, try a 7-8B model (e.g. `LLM_MODEL=qwen2.5:7b`) for better judgement.
+The 7B model (4-bit, about 4.7 GB) is the largest that runs at a usable speed on
+a CPU-only laptop with 16 GB RAM. On a weaker machine use `LLM_MODEL=qwen2.5:3b`:
+it is about twice as fast but less accurate and less consistent.
+
+## Usage
+
+```bash
+python scripts/analyse_cv.py path/to/cv.pdf path/to/job.txt
+python scripts/analyse_cv.py cv.docx job.txt --json report.json   # also save JSON
+```
+
+How it works:
+
+1. The CV is split into sections and chunks, and the chunks are embedded.
+2. The LLM extracts the job requirements (must-have vs nice-to-have).
+3. For each requirement the most similar CV chunks are retrieved, and the LLM
+   marks it met / partial / missing with a quote from the CV (5 per batch).
+4. Every quote is checked against the CV text; unverified quotes earn half credit.
+5. The score is computed in code: must-haves count double, partial counts half.
+6. The LLM writes strengths, gaps, suggestions and a verdict.
+
+On a CPU-only laptop with `qwen2.5:7b`, a job with about 10 requirements takes
+8-10 minutes (2-3 minutes with `qwen2.5:3b`).
 
 ## Tests
 

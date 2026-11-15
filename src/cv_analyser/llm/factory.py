@@ -9,7 +9,7 @@ def create_llm_client() -> LLMClient:
     """Build the client chosen by environment variables.
 
     LLM_PROVIDER  which backend to use (default: ollama)
-    LLM_MODEL     model name for that backend (default: qwen2.5:3b)
+    LLM_MODEL     model name for that backend (default: qwen2.5:7b)
     OLLAMA_URL    Ollama server address (default: http://localhost:11434)
     """
     provider = os.environ.get("LLM_PROVIDER", "ollama").strip().lower()
