@@ -17,6 +17,7 @@ Usage:
     python scripts/run_eval.py --out data/eval/results/run.json --fresh     # discard checkpoint
     python scripts/run_eval.py --out data/eval/results/quick.json --pairs cv_a --no-extraction
 """
+
 import argparse
 import json
 import sys
@@ -33,7 +34,7 @@ from cv_analyser.analysis import (
     extract_requirements_llm,
     judge_requirements,
 )
-from cv_analyser.embedder import SentenceTransformerEmbedder
+from cv_analyser.embedder import Embedder, SentenceTransformerEmbedder
 from cv_analyser.job_description import load_job_description
 from cv_analyser.llm.factory import create_llm_client
 from cv_analyser.loaders.dispatcher import load_document
@@ -50,12 +51,16 @@ def main() -> int:
     parser.add_argument("--key", type=Path, default=Path("data/eval/answer_key.json"))
     parser.add_argument("--cv-dir", type=Path, default=Path("data/eval/cvs"))
     parser.add_argument("--jd-dir", type=Path, default=Path("data/jds"))
-    parser.add_argument("--out", type=Path, required=True,
-                        help="Final results JSON; the checkpoint is kept next to it")
+    parser.add_argument(
+        "--out", type=Path, required=True, help="Final results JSON; the checkpoint is kept next to it"
+    )
     parser.add_argument("--batch", type=int, help="Run at most this many remaining pairs, then stop")
     parser.add_argument("--fresh", action="store_true", help="Discard the checkpoint and start over")
-    parser.add_argument("--keep-loaded", action="store_true",
-                        help="Leave the model in memory after the batch (default: unload it)")
+    parser.add_argument(
+        "--keep-loaded",
+        action="store_true",
+        help="Leave the model in memory after the batch (default: unload it)",
+    )
     parser.add_argument("--pairs", help="Only run pairs whose CV or JD name contains this text")
     parser.add_argument("--no-extraction", action="store_true", help="Skip the extraction check")
     parser.add_argument("--no-negative", action="store_true", help="Skip the mismatched pairs")
@@ -71,7 +76,7 @@ def main() -> int:
         return 1
 
     llm = create_llm_client()
-    model = getattr(llm, "model", "?")
+    model = llm.model
     checkpoint = args.out.with_name(args.out.stem + ".checkpoint.jsonl")
     if args.fresh:
         checkpoint.unlink(missing_ok=True)
@@ -80,29 +85,35 @@ def main() -> int:
         return 1
     pending = [p for p in pairs if _pair_id(p) not in done]
     todo = pending[: args.batch] if args.batch else pending
-    print(f"{len(pairs) - len(pending)}/{len(pairs)} pairs already done; running {len(todo)} now",
-          flush=True)
+    print(f"{len(pairs) - len(pending)}/{len(pairs)} pairs already done; running {len(todo)} now", flush=True)
 
-    embedder = SentenceTransformerEmbedder() if todo else None
+    # Loading the embedding model takes ~20 s, so skip it when only the summary is left.
+    embedder: Embedder | None = SentenceTransformerEmbedder() if todo else None
     started = time.monotonic()
     checkpoint.parent.mkdir(parents=True, exist_ok=True)
     for number, pair in enumerate(todo, start=1):
-        print(f"[{time.monotonic() - started:6.0f}s] {number}/{len(todo)} "
-              f"{pair['cv']} x {pair['jd']} ({pair['kind']})", flush=True)
+        print(
+            f"[{time.monotonic() - started:6.0f}s] {number}/{len(todo)} "
+            f"{pair['cv']} x {pair['jd']} ({pair['kind']})",
+            flush=True,
+        )
         cv_text = load_document(args.cv_dir / f"{pair['cv']}.docx")
         jd_text = load_job_description(args.jd_dir / pair["jd"])
+        assert embedder is not None  # loaded above whenever there is work to do
         retriever = build_retriever(cv_text, embedder)
-        before = asdict(llm.usage) if hasattr(llm, "usage") else None
+        usage = getattr(llm, "usage", None)  # only OllamaClient counts tokens
+        before = asdict(usage) if usage is not None else None
         pair_started = time.monotonic()
 
         if pair["kind"] == "negative":
             result = _run_negative(pair, llm, retriever, cv_text, jd_text)
         else:
-            result = _run_labelled(pair, llm, retriever, cv_text, jd_text, embedder,
-                                   check_extraction=not args.no_extraction)
+            result = _run_labelled(
+                pair, llm, retriever, cv_text, jd_text, embedder, check_extraction=not args.no_extraction
+            )
         result["seconds"] = round(time.monotonic() - pair_started, 1)
-        if before is not None:
-            result["usage"] = {k: round(v - before[k], 1) for k, v in asdict(llm.usage).items()}
+        if usage is not None and before is not None:
+            result["usage"] = {k: round(v - before[k], 1) for k, v in asdict(usage).items()}
         result["model"] = model
         # Append one line per pair, so a stop or crash loses at most the pair in progress.
         with checkpoint.open("a", encoding="utf-8") as file:
@@ -115,8 +126,10 @@ def main() -> int:
 
     remaining = [p for p in pairs if _pair_id(p) not in done]
     if remaining:
-        print(f"\n{len(pairs) - len(remaining)}/{len(pairs)} pairs done. "
-              "Run the same command again to continue.")
+        print(
+            f"\n{len(pairs) - len(remaining)}/{len(pairs)} pairs done. "
+            "Run the same command again to continue."
+        )
         return 0
 
     results = [done[_pair_id(p)] for p in pairs]
@@ -134,7 +147,7 @@ def _pair_id(pair):
 
 def _load_checkpoint(path, model):
     """Return finished results keyed by pair, or None if they came from another model."""
-    done = {}
+    done: dict[str, dict] = {}
     if not path.exists():
         return done
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -145,8 +158,11 @@ def _load_checkpoint(path, model):
         except json.JSONDecodeError:
             continue  # a line cut short by a crash; that pair simply runs again
         if result.get("model") != model:
-            print(f"Checkpoint {path} was made with model {result.get('model')!r}, not {model!r}. "
-                  "Use --fresh to start over.", file=sys.stderr)
+            print(
+                f"Checkpoint {path} was made with model {result.get('model')!r}, not {model!r}. "
+                "Use --fresh to start over.",
+                file=sys.stderr,
+            )
             return None
         done[_pair_id(result)] = result
     return done
@@ -161,25 +177,30 @@ def _run_labelled(pair, llm, retriever, cv_text, jd_text, embedder, check_extrac
     verdicts = judge_requirements(llm, retriever, cv_text, requirements)
 
     graded = []
-    for row, verdict in zip(rows, verdicts):
+    for row, verdict in zip(rows, verdicts, strict=True):
         allowed = [row["expected"], *row.get("acceptable", [])]
-        graded.append({
-            "text": row["text"],
-            "expected": row["expected"],
-            "got": verdict.status,
-            "strict": verdict.status == row["expected"],
-            "lenient": verdict.status in allowed,
-            # Claiming "met" for something the CV does not have is the worst error.
-            "false_met": verdict.status == "met" and row["expected"] == "missing",
-            "evidence": verdict.evidence,
-            "evidence_verified": verdict.evidence_verified,
-            "reasoning": verdict.reasoning,
-            "trap": row.get("trap", ""),
-        })
+        graded.append(
+            {
+                "text": row["text"],
+                "expected": row["expected"],
+                "got": verdict.status,
+                "strict": verdict.status == row["expected"],
+                "lenient": verdict.status in allowed,
+                # Claiming "met" for something the CV does not have is the worst error.
+                "false_met": verdict.status == "met" and row["expected"] == "missing",
+                "evidence": verdict.evidence,
+                "evidence_verified": verdict.evidence_verified,
+                "reasoning": verdict.reasoning,
+                "trap": row.get("trap", ""),
+            }
+        )
 
     result = {
-        "cv": pair["cv"], "jd": pair["jd"], "kind": pair["kind"],
-        "score": compute_score(verdicts), "expected_score": pair["expected_score"],
+        "cv": pair["cv"],
+        "jd": pair["jd"],
+        "kind": pair["kind"],
+        "score": compute_score(verdicts),
+        "expected_score": pair["expected_score"],
         "rows": graded,
     }
     if check_extraction:
@@ -192,8 +213,12 @@ def _run_negative(pair, llm, retriever, cv_text, jd_text):
     verdicts = judge_requirements(llm, retriever, cv_text, requirements)
     score = compute_score(verdicts)
     return {
-        "cv": pair["cv"], "jd": pair["jd"], "kind": "negative",
-        "score": score, "max_score": pair["max_score"], "passed": score <= pair["max_score"],
+        "cv": pair["cv"],
+        "jd": pair["jd"],
+        "kind": "negative",
+        "score": score,
+        "max_score": pair["max_score"],
+        "passed": score <= pair["max_score"],
         "met": [v.requirement.text for v in verdicts if v.status == "met"],
     }
 
@@ -207,9 +232,14 @@ def _check_extraction(llm, embedder, jd_text, rows):
     similarity = embedder.embed(key_texts) @ embedder.embed(found_texts).T
     best = similarity.argmax(axis=1)
     matches = [
-        {"key": key, "closest": found_texts[j], "similarity": round(float(similarity[i, j]), 2),
-         "key_mandatory": rows[i].get("mandatory", False), "found_mandatory": extracted[j].mandatory}
-        for i, (key, j) in enumerate(zip(key_texts, best))
+        {
+            "key": key,
+            "closest": found_texts[j],
+            "similarity": round(float(similarity[i, j]), 2),
+            "key_mandatory": rows[i].get("mandatory", False),
+            "found_mandatory": extracted[j].mandatory,
+        }
+        for i, (key, j) in enumerate(zip(key_texts, best, strict=True))
     ]
     covered = sum(m["similarity"] >= COVERAGE_THRESHOLD for m in matches)
     return {"extracted": len(found_texts), "key": len(key_texts), "covered": covered, "matches": matches}
@@ -229,12 +259,16 @@ def _summarise(results):
         "lenient_accuracy": _pct(sum(r["lenient"] for r in rows), len(rows)),
         "false_met": sum(r["false_met"] for r in rows),
         "unverified_evidence": sum(not r["evidence_verified"] for r in claimed),
-        "score_mean_abs_error": round(float(np.mean(
-            [abs(r["score"] - r["expected_score"]) for r in labelled])), 1) if labelled else None,
+        "score_mean_abs_error": round(
+            float(np.mean([abs(r["score"] - r["expected_score"]) for r in labelled])), 1
+        )
+        if labelled
+        else None,
         "confusion": {f"{e}->{g}": confusion[(e, g)] for e in STATUSES for g in STATUSES},
         "negatives_passed": f"{sum(r['passed'] for r in negatives)}/{len(negatives)}",
-        "extraction_coverage": _pct(sum(e["covered"] for e in extraction),
-                                    sum(e["key"] for e in extraction)) if extraction else None,
+        "extraction_coverage": _pct(sum(e["covered"] for e in extraction), sum(e["key"] for e in extraction))
+        if extraction
+        else None,
         # Mandatory flags: how many the key marks, how many extraction caught,
         # and how many it added where the key has none.
         "mandatory_flags": _mandatory_flags(extraction),
@@ -261,7 +295,9 @@ def _mandatory_flags(extraction):
     return {
         "in_key": sum(m.get("key_mandatory", False) for m in matches),
         "caught": sum(m.get("key_mandatory", False) and m.get("found_mandatory", False) for m in matches),
-        "false_flags": sum(m.get("found_mandatory", False) and not m.get("key_mandatory", False) for m in matches),
+        "false_flags": sum(
+            m.get("found_mandatory", False) and not m.get("key_mandatory", False) for m in matches
+        ),
     }
 
 
@@ -281,8 +317,10 @@ def _print_report(results, summary):
         if "extraction" in r:
             e = r["extraction"]
             extra = f"  extraction {e['covered']}/{e['key']} covered ({e['extracted']} found)"
-        print(f"{r['cv']:22} x {r['jd']:10} {r['kind']:9} {ok}/{len(r['rows'])} strict  "
-              f"score {r['score']:3} (expected {r['expected_score']}){extra}  {r['seconds']:.0f}s")
+        print(
+            f"{r['cv']:22} x {r['jd']:10} {r['kind']:9} {ok}/{len(r['rows'])} strict  "
+            f"score {r['score']:3} (expected {r['expected_score']}){extra}  {r['seconds']:.0f}s"
+        )
 
     print("\n=== Misses (strict) ===")
     for r in results:

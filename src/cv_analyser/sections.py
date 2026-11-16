@@ -2,7 +2,13 @@ from dataclasses import dataclass
 
 _HEADINGS = {
     "summary": ("summary", "professional summary", "profile", "objective", "career objective"),
-    "experience": ("experience", "work experience", "professional experience", "employment history", "work history"),
+    "experience": (
+        "experience",
+        "work experience",
+        "professional experience",
+        "employment history",
+        "work history",
+    ),
     "education": ("education", "academic background", "academic qualifications"),
     "skills": ("skills", "technical skills", "key skills", "core competencies"),
     "projects": ("projects", "personal projects", "academic projects"),
@@ -13,9 +19,7 @@ _HEADINGS = {
     "interests": ("interests", "hobbies", "hobbies and interests"),
 }
 
-_HEADING_LOOKUP = {
-    alias: name for name, aliases in _HEADINGS.items() for alias in aliases
-}
+_HEADING_LOOKUP = {alias: name for name, aliases in _HEADINGS.items() for alias in aliases}
 
 
 @dataclass(frozen=True)

@@ -89,7 +89,7 @@ def test_http_error_includes_server_detail(capture):
         "http://x", 404, "Not Found", {}, io.BytesIO(b'{"error":"model not found"}')
     )
 
-    with pytest.raises(LLMError, match="404.*model not found"):
+    with pytest.raises(LLMError, match=r"404.*model not found"):
         OllamaClient().generate_structured("sys", "user", _Answer)
 
 

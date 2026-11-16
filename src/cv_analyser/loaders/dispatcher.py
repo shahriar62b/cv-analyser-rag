@@ -12,7 +12,5 @@ def load_document(path: str | Path) -> str:
     path = Path(path)
     loader = _LOADERS.get(path.suffix.lower())
     if loader is None:
-        raise UnsupportedFileTypeError(
-            f"Unsupported file type '{path.suffix}'. Use PDF or DOCX."
-        )
+        raise UnsupportedFileTypeError(f"Unsupported file type '{path.suffix}'. Use PDF or DOCX.")
     return clean_text(loader(path))

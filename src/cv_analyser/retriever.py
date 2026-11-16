@@ -4,9 +4,7 @@ from cv_analyser.vector_store import InMemoryVectorStore, SearchResult
 
 
 class CVRetriever:
-    def __init__(
-        self, embedder: Embedder, store: InMemoryVectorStore | None = None
-    ) -> None:
+    def __init__(self, embedder: Embedder, store: InMemoryVectorStore | None = None) -> None:
         self._embedder = embedder
         # "is not None" matters: an empty store is falsy because it defines __len__.
         self._store = store if store is not None else InMemoryVectorStore()

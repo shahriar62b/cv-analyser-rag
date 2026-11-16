@@ -34,6 +34,7 @@ def test_text_without_headings_is_one_header_section():
 def test_empty_text_gives_no_sections():
     assert split_into_sections("") == []
 
+
 def test_secondary_cv_headings_get_their_own_sections():
     text = "Achievements\nCodeforces finalist\nVolunteer Work\nData for an NGO\nInterests\nFintech"
 
