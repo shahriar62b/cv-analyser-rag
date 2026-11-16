@@ -118,3 +118,11 @@ def test_usage_adds_up_timing_fields_across_calls(capture):
     assert client.usage.output_tokens == 40
     assert client.usage.load_seconds == pytest.approx(4.0)
     assert client.usage.output_seconds == pytest.approx(8.0)
+
+
+def test_unload_asks_ollama_to_drop_the_model(capture):
+    capture["reply"] = {"done": True}
+    OllamaClient(model="tiny").unload()
+
+    assert capture["url"].endswith("/api/generate")
+    assert capture["payload"] == {"model": "tiny", "keep_alive": 0}

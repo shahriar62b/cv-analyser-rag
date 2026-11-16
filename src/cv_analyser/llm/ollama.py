@@ -88,6 +88,10 @@ class OllamaClient:
                 f"Model '{self._model}' returned output that does not match {schema.__name__}"
             ) from exc
 
+    def unload(self) -> None:
+        """Free the model's memory now instead of waiting for keep_alive to expire."""
+        self._post("/api/generate", {"model": self._model, "keep_alive": 0})
+
     def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
         request = urllib.request.Request(
             self._base_url + path,
