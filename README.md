@@ -83,9 +83,12 @@ It reports strict and lenient accuracy, "met" claims for missing requirements,
 unverified evidence, score error, extraction coverage and speed.
 
 ```bash
-python scripts/run_eval.py --out data/eval/results/run.json
-python scripts/run_eval.py --pairs cv_a --no-extraction   # quick subset
+python scripts/run_eval.py --out data/eval/results/run.json --batch 3   # repeat until done
+python scripts/run_eval.py --out data/eval/results/quick.json --pairs cv_a --no-extraction
 ```
+
+Each finished pair is saved to a checkpoint next to `--out`, so a long run can be
+split into batches and continued later; the model is unloaded after each batch.
 
 ## Tests
 
