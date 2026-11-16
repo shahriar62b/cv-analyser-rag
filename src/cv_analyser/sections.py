@@ -7,6 +7,10 @@ _HEADINGS = {
     "skills": ("skills", "technical skills", "key skills", "core competencies"),
     "projects": ("projects", "personal projects", "academic projects"),
     "certifications": ("certifications", "certificates", "licenses", "training"),
+    "achievements": ("achievements", "awards", "honors", "honours", "awards and achievements"),
+    "languages": ("languages", "language skills"),
+    "volunteering": ("volunteer work", "volunteering", "volunteer experience"),
+    "interests": ("interests", "hobbies", "hobbies and interests"),
 }
 
 _HEADING_LOOKUP = {

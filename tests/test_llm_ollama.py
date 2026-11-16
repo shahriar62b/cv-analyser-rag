@@ -54,6 +54,7 @@ def test_sends_schema_messages_and_options(capture):
     assert capture["url"] == "http://host:1234/api/chat"
     assert payload["model"] == "tiny"
     assert payload["stream"] is False
+    assert payload["keep_alive"] == "30m"
     assert payload["format"] == _Answer.model_json_schema()
     assert payload["messages"] == [
         {"role": "system", "content": "be strict"},
@@ -97,3 +98,31 @@ def test_timeout_raises(capture):
 
     with pytest.raises(LLMError, match="did not answer"):
         OllamaClient(timeout=5).generate_structured("sys", "user", _Answer)
+
+
+def test_usage_adds_up_timing_fields_across_calls(capture):
+    capture["reply"] = {
+        "message": {"content": '{"skill": "Python", "years": 3}'},
+        "prompt_eval_count": 100,
+        "eval_count": 20,
+        "load_duration": 2_000_000_000,
+        "prompt_eval_duration": 1_000_000_000,
+        "eval_duration": 4_000_000_000,
+    }
+    client = OllamaClient()
+    client.generate_structured("sys", "user", _Answer)
+    client.generate_structured("sys", "user", _Answer)
+
+    assert client.usage.calls == 2
+    assert client.usage.prompt_tokens == 200
+    assert client.usage.output_tokens == 40
+    assert client.usage.load_seconds == pytest.approx(4.0)
+    assert client.usage.output_seconds == pytest.approx(8.0)
+
+
+def test_unload_asks_ollama_to_drop_the_model(capture):
+    capture["reply"] = {"done": True}
+    OllamaClient(model="tiny").unload()
+
+    assert capture["url"].endswith("/api/generate")
+    assert capture["payload"] == {"model": "tiny", "keep_alive": 0}

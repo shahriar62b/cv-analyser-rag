@@ -11,6 +11,11 @@ class Requirement(BaseModel):
         default=True,
         description="False only if the job description calls it optional, preferred or a plus",
     )
+    mandatory: bool = Field(
+        default=False,
+        description="True only if the job description explicitly calls it mandatory, "
+        "compulsory, essential or non-negotiable",
+    )
 
 
 class RequirementVerdict(BaseModel):
@@ -34,3 +39,10 @@ class CVReport(BaseModel):
     verdicts: list[RequirementVerdict]
     overall_score: int = Field(ge=0, le=100)
     summary: CVSummary
+
+    @property
+    def unmet_mandatory(self) -> list[RequirementVerdict]:
+        """Requirements the job calls mandatory that the CV does not fully meet.
+        The score is not changed; these are flagged so a likely rejection is not
+        hidden behind an otherwise good score."""
+        return [v for v in self.verdicts if v.requirement.mandatory and v.status != "met"]

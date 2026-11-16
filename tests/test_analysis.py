@@ -214,3 +214,86 @@ def test_missing_verdict_hides_unrelated_quote(make_fake_llm, retriever):
     [verdict] = judge_requirements(llm, retriever, CV_TEXT, [Requirement(text="Kafka")])
 
     assert verdict.evidence == ""
+
+
+def test_verdicts_are_streamed_per_batch(make_fake_llm, retriever):
+    requirements = [Requirement(text=t) for t in ("Python APIs", "PostgreSQL", "Kubernetes")]
+    llm = make_fake_llm(
+        [
+            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"), _judgement(2, "missing")]},
+            {"judgements": [_judgement(3, "missing")]},
+        ]
+    )
+    batches = []
+
+    verdicts = judge_requirements(
+        llm, retriever, CV_TEXT, requirements, batch_size=2, on_verdicts=batches.append
+    )
+
+    assert [[v.requirement.text for v in batch] for batch in batches] == [
+        ["Python APIs", "PostgreSQL"],
+        ["Kubernetes"],
+    ]
+    assert batches[0][0] == verdicts[0]
+
+
+def test_given_requirements_skip_extraction(make_fake_llm, fake_embedder):
+    llm = make_fake_llm([{"judgements": [_judgement(1, "missing")]}, SUMMARY])
+    messages = []
+
+    report = analyse_cv(
+        CV_TEXT, "job text", llm, fake_embedder,
+        progress=messages.append, requirements=[Requirement(text="Go")],
+    )
+
+    assert len(llm.calls) == 2
+    assert report.verdicts[0].requirement.text == "Go"
+    assert not any(m.startswith("Extracting") for m in messages)
+
+
+def test_unmet_mandatory_is_flagged_without_changing_the_score(make_fake_llm, fake_embedder):
+    llm = make_fake_llm(
+        [
+            {"requirements": [{"text": "Python APIs", "must_have": True},
+                              {"text": "Inditex buyers", "must_have": True, "mandatory": True}]},
+            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"),
+                            _judgement(2, "missing")]},
+            SUMMARY,
+        ]
+    )
+
+    report = analyse_cv(CV_TEXT, "Inditex buyer experience is mandatory.", llm, fake_embedder)
+
+    assert report.overall_score == 50
+    assert [v.requirement.text for v in report.unmet_mandatory] == ["Inditex buyers"]
+    assert "Mandatory requirements not met: Inditex buyers" in llm.calls[2][1]
+
+
+def test_summary_prompt_has_no_mandatory_line_when_all_are_met(make_fake_llm):
+    llm = make_fake_llm([SUMMARY])
+    verdict = _verdict("met")
+    verdict.requirement.mandatory = True
+
+    summarise(llm, [verdict], score=100)
+
+    assert "Mandatory" not in llm.calls[0][1]
+
+
+@pytest.mark.parametrize(
+    ("job_text", "expected"),
+    [
+        ("Python is required. Docker is a must.", [False, False]),
+        ("Inditex buyer experience is mandatory. Python is required.", [True, False]),
+    ],
+)
+def test_mandatory_flag_is_kept_only_when_the_job_uses_mandatory_wording(
+    make_fake_llm, job_text, expected
+):
+    llm = make_fake_llm(
+        [{"requirements": [{"text": "Inditex buyers", "must_have": True, "mandatory": True},
+                           {"text": "Python", "must_have": True, "mandatory": False}]}]
+    )
+
+    requirements = extract_requirements_llm(llm, job_text)
+
+    assert [r.mandatory for r in requirements] == expected
