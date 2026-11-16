@@ -28,17 +28,15 @@ from pathlib import Path
 
 import numpy as np
 
-from cv_analyser.analysis import (
-    build_retriever,
-    compute_score,
-    extract_requirements_llm,
-    judge_requirements,
-)
+from cv_analyser.analysis import build_retriever
 from cv_analyser.embedder import Embedder, SentenceTransformerEmbedder
+from cv_analyser.extraction import extract_requirements_llm
 from cv_analyser.job_description import load_job_description
+from cv_analyser.judging import judge_requirements
 from cv_analyser.llm.factory import create_llm_client
 from cv_analyser.loaders.dispatcher import load_document
 from cv_analyser.report import Requirement
+from cv_analyser.scoring import compute_score
 
 STATUSES = ("met", "partial", "missing")
 # Cosine similarity above which an extracted requirement counts as covering a
