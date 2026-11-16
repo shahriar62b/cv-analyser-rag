@@ -262,7 +262,7 @@ def test_unmet_mandatory_is_flagged_without_changing_the_score(make_fake_llm, fa
         ]
     )
 
-    report = analyse_cv(CV_TEXT, "job text", llm, fake_embedder)
+    report = analyse_cv(CV_TEXT, "Inditex buyer experience is mandatory.", llm, fake_embedder)
 
     assert report.overall_score == 50
     assert [v.requirement.text for v in report.unmet_mandatory] == ["Inditex buyers"]
@@ -277,3 +277,23 @@ def test_summary_prompt_has_no_mandatory_line_when_all_are_met(make_fake_llm):
     summarise(llm, [verdict], score=100)
 
     assert "Mandatory" not in llm.calls[0][1]
+
+
+@pytest.mark.parametrize(
+    ("job_text", "expected"),
+    [
+        ("Python is required. Docker is a must.", [False, False]),
+        ("Inditex buyer experience is mandatory. Python is required.", [True, False]),
+    ],
+)
+def test_mandatory_flag_is_kept_only_when_the_job_uses_mandatory_wording(
+    make_fake_llm, job_text, expected
+):
+    llm = make_fake_llm(
+        [{"requirements": [{"text": "Inditex buyers", "must_have": True, "mandatory": True},
+                           {"text": "Python", "must_have": True, "mandatory": False}]}]
+    )
+
+    requirements = extract_requirements_llm(llm, job_text)
+
+    assert [r.mandatory for r in requirements] == expected
