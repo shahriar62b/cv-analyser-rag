@@ -7,9 +7,15 @@ full extract-and-judge flow and must score low.
 
 The summary step is skipped: it does not change the verdicts or the score.
 
+Each finished pair is appended to a checkpoint file next to --out, so a run can
+be split into batches and stopped at any time. Running the same command again
+continues with the pairs not yet done. The final JSON is written once every
+selected pair is done. After each batch the model is unloaded from memory.
+
 Usage:
-    python scripts/run_eval.py --out data/eval/results/baseline.json
-    python scripts/run_eval.py --pairs cv_a --no-extraction     # quick subset
+    python scripts/run_eval.py --out data/eval/results/run.json --batch 3   # repeat until done
+    python scripts/run_eval.py --out data/eval/results/run.json --fresh     # discard checkpoint
+    python scripts/run_eval.py --out data/eval/results/quick.json --pairs cv_a --no-extraction
 """
 import argparse
 import json
@@ -21,15 +27,17 @@ from pathlib import Path
 
 import numpy as np
 
-from cv_analyser.analysis import compute_score, extract_requirements_llm, judge_requirements
-from cv_analyser.chunker import chunk_sections
+from cv_analyser.analysis import (
+    build_retriever,
+    compute_score,
+    extract_requirements_llm,
+    judge_requirements,
+)
 from cv_analyser.embedder import SentenceTransformerEmbedder
 from cv_analyser.job_description import load_job_description
 from cv_analyser.llm.factory import create_llm_client
 from cv_analyser.loaders.dispatcher import load_document
 from cv_analyser.report import Requirement
-from cv_analyser.retriever import CVRetriever
-from cv_analyser.sections import split_into_sections
 
 STATUSES = ("met", "partial", "missing")
 # Cosine similarity above which an extracted requirement counts as covering a
@@ -42,7 +50,12 @@ def main() -> int:
     parser.add_argument("--key", type=Path, default=Path("data/eval/answer_key.json"))
     parser.add_argument("--cv-dir", type=Path, default=Path("data/eval/cvs"))
     parser.add_argument("--jd-dir", type=Path, default=Path("data/jds"))
-    parser.add_argument("--out", type=Path, help="Save full results as JSON here")
+    parser.add_argument("--out", type=Path, required=True,
+                        help="Final results JSON; the checkpoint is kept next to it")
+    parser.add_argument("--batch", type=int, help="Run at most this many remaining pairs, then stop")
+    parser.add_argument("--fresh", action="store_true", help="Discard the checkpoint and start over")
+    parser.add_argument("--keep-loaded", action="store_true",
+                        help="Leave the model in memory after the batch (default: unload it)")
     parser.add_argument("--pairs", help="Only run pairs whose CV or JD name contains this text")
     parser.add_argument("--no-extraction", action="store_true", help="Skip the extraction check")
     parser.add_argument("--no-negative", action="store_true", help="Skip the mismatched pairs")
@@ -58,16 +71,27 @@ def main() -> int:
         return 1
 
     llm = create_llm_client()
-    embedder = SentenceTransformerEmbedder()
+    model = getattr(llm, "model", "?")
+    checkpoint = args.out.with_name(args.out.stem + ".checkpoint.jsonl")
+    if args.fresh:
+        checkpoint.unlink(missing_ok=True)
+    done = _load_checkpoint(checkpoint, model)
+    if done is None:
+        return 1
+    pending = [p for p in pairs if _pair_id(p) not in done]
+    todo = pending[: args.batch] if args.batch else pending
+    print(f"{len(pairs) - len(pending)}/{len(pairs)} pairs already done; running {len(todo)} now",
+          flush=True)
+
+    embedder = SentenceTransformerEmbedder() if todo else None
     started = time.monotonic()
-    results = []
-    for number, pair in enumerate(pairs, start=1):
-        print(f"[{time.monotonic() - started:6.0f}s] {number}/{len(pairs)} "
+    checkpoint.parent.mkdir(parents=True, exist_ok=True)
+    for number, pair in enumerate(todo, start=1):
+        print(f"[{time.monotonic() - started:6.0f}s] {number}/{len(todo)} "
               f"{pair['cv']} x {pair['jd']} ({pair['kind']})", flush=True)
         cv_text = load_document(args.cv_dir / f"{pair['cv']}.docx")
         jd_text = load_job_description(args.jd_dir / pair["jd"])
-        retriever = CVRetriever(embedder)
-        retriever.index(chunk_sections(split_into_sections(cv_text)))
+        retriever = build_retriever(cv_text, embedder)
         before = asdict(llm.usage) if hasattr(llm, "usage") else None
         pair_started = time.monotonic()
 
@@ -79,16 +103,53 @@ def main() -> int:
         result["seconds"] = round(time.monotonic() - pair_started, 1)
         if before is not None:
             result["usage"] = {k: round(v - before[k], 1) for k, v in asdict(llm.usage).items()}
-        results.append(result)
+        result["model"] = model
+        # Append one line per pair, so a stop or crash loses at most the pair in progress.
+        with checkpoint.open("a", encoding="utf-8") as file:
+            file.write(json.dumps(result, ensure_ascii=False) + "\n")
+        done[_pair_id(result)] = result
 
-    summary = _summarise(results, time.monotonic() - started, llm)
+    if todo and not args.keep_loaded and hasattr(llm, "unload"):
+        llm.unload()
+        print("Unloaded the model from memory.", flush=True)
+
+    remaining = [p for p in pairs if _pair_id(p) not in done]
+    if remaining:
+        print(f"\n{len(pairs) - len(remaining)}/{len(pairs)} pairs done. "
+              "Run the same command again to continue.")
+        return 0
+
+    results = [done[_pair_id(p)] for p in pairs]
+    summary = _summarise(results)
     _print_report(results, summary)
-    if args.out:
-        args.out.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"model": getattr(llm, "model", "?"), "summary": summary, "pairs": results}
-        args.out.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-        print(f"\nSaved results to {args.out}")
+    payload = {"model": model, "summary": summary, "pairs": results}
+    args.out.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"\nSaved results to {args.out}")
     return 0
+
+
+def _pair_id(pair):
+    return f"{pair['cv']}|{pair['jd']}"
+
+
+def _load_checkpoint(path, model):
+    """Return finished results keyed by pair, or None if they came from another model."""
+    done = {}
+    if not path.exists():
+        return done
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            result = json.loads(line)
+        except json.JSONDecodeError:
+            continue  # a line cut short by a crash; that pair simply runs again
+        if result.get("model") != model:
+            print(f"Checkpoint {path} was made with model {result.get('model')!r}, not {model!r}. "
+                  "Use --fresh to start over.", file=sys.stderr)
+            return None
+        done[_pair_id(result)] = result
+    return done
 
 
 def _run_labelled(pair, llm, retriever, cv_text, jd_text, embedder, check_extraction):
@@ -154,7 +215,7 @@ def _check_extraction(llm, embedder, jd_text, rows):
     return {"extracted": len(found_texts), "key": len(key_texts), "covered": covered, "matches": matches}
 
 
-def _summarise(results, seconds, llm):
+def _summarise(results):
     rows = [row for r in results if r["kind"] != "negative" for row in r["rows"]]
     labelled = [r for r in results if r["kind"] != "negative"]
     negatives = [r for r in results if r["kind"] == "negative"]
@@ -177,18 +238,20 @@ def _summarise(results, seconds, llm):
         # Mandatory flags: how many the key marks, how many extraction caught,
         # and how many it added where the key has none.
         "mandatory_flags": _mandatory_flags(extraction),
-        "total_seconds": round(seconds),
+        # Summed over pairs, so it is the compute time even when split into batches.
+        "total_seconds": round(sum(r["seconds"] for r in results)),
     }
-    if hasattr(llm, "usage"):
-        usage = llm.usage
+    usages = [r["usage"] for r in results if "usage" in r]
+    if usages:
+        total = {key: sum(u[key] for u in usages) for key in usages[0]}
         summary["llm"] = {
-            "calls": usage.calls,
-            "prompt_tokens": usage.prompt_tokens,
-            "output_tokens": usage.output_tokens,
-            "output_tokens_per_second": round(usage.output_tokens / max(usage.output_seconds, 0.1), 1),
-            "load_seconds": round(usage.load_seconds),
-            "prompt_seconds": round(usage.prompt_seconds),
-            "output_seconds": round(usage.output_seconds),
+            "calls": int(total["calls"]),
+            "prompt_tokens": int(total["prompt_tokens"]),
+            "output_tokens": int(total["output_tokens"]),
+            "output_tokens_per_second": round(total["output_tokens"] / max(total["output_seconds"], 0.1), 1),
+            "load_seconds": round(total["load_seconds"]),
+            "prompt_seconds": round(total["prompt_seconds"]),
+            "output_seconds": round(total["output_seconds"]),
         }
     return summary
 
@@ -196,9 +259,9 @@ def _summarise(results, seconds, llm):
 def _mandatory_flags(extraction):
     matches = [m for e in extraction for m in e["matches"]]
     return {
-        "in_key": sum(m["key_mandatory"] for m in matches),
-        "caught": sum(m["key_mandatory"] and m["found_mandatory"] for m in matches),
-        "false_flags": sum(m["found_mandatory"] and not m["key_mandatory"] for m in matches),
+        "in_key": sum(m.get("key_mandatory", False) for m in matches),
+        "caught": sum(m.get("key_mandatory", False) and m.get("found_mandatory", False) for m in matches),
+        "false_flags": sum(m.get("found_mandatory", False) and not m.get("key_mandatory", False) for m in matches),
     }
 
 
