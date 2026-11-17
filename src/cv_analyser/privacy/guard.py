@@ -14,7 +14,7 @@ import re
 from cv_analyser.exceptions import PrivacyLeakError
 from cv_analyser.llm.base import LLMClient, T
 from cv_analyser.privacy.patterns import mask_generic, normalise, phone_pattern, word_pattern
-from cv_analyser.privacy.redactor import Identity
+from cv_analyser.privacy.redactor import Identity, redact_cv
 
 
 class OutboundGuard:
@@ -66,3 +66,17 @@ class PrivateLLMClient:
                 f"Blocked a request that still contained personal data ({', '.join(found)})"
             )
         return self._fallback.generate_structured(system, user, schema)
+
+
+def protect_for_cloud(
+    cv_text: str,
+    llm: LLMClient,
+    fallback: LLMClient | None,
+    extra_terms: tuple[str, ...] = (),
+) -> tuple[str, PrivateLLMClient]:
+    """Mask the CV and wrap the client, the two steps every cloud run needs.
+
+    Returns the masked CV text (analyse that, not the original) and the guarded client.
+    """
+    redacted = redact_cv(cv_text, extra_terms)
+    return redacted.text, PrivateLLMClient(llm, OutboundGuard(redacted.identity), fallback)

@@ -33,8 +33,10 @@ from cv_analyser.embedder import Embedder, SentenceTransformerEmbedder
 from cv_analyser.extraction import extract_requirements_llm
 from cv_analyser.job_description import load_job_description
 from cv_analyser.judging import judge_requirements
-from cv_analyser.llm.factory import create_llm_client
+from cv_analyser.llm.base import LLMClient
+from cv_analyser.llm.factory import create_llm_client, is_local_provider
 from cv_analyser.loaders.dispatcher import load_document
+from cv_analyser.privacy import protect_for_cloud
 from cv_analyser.report import Requirement
 from cv_analyser.scoring import compute_score
 
@@ -75,6 +77,7 @@ def main() -> int:
 
     llm = create_llm_client()
     model = llm.model
+    cloud = not is_local_provider()
     checkpoint = args.out.with_name(args.out.stem + ".checkpoint.jsonl")
     if args.fresh:
         checkpoint.unlink(missing_ok=True)
@@ -97,17 +100,23 @@ def main() -> int:
         )
         cv_text = load_document(args.cv_dir / f"{pair['cv']}.docx")
         jd_text = load_job_description(args.jd_dir / pair["jd"])
+        pair_llm: LLMClient = llm
+        if cloud:
+            # Same privacy path as real use, so the eval measures what users get.
+            # No local fallback: a blocked request stops the run instead of
+            # silently mixing in local-model answers.
+            cv_text, pair_llm = protect_for_cloud(cv_text, llm, fallback=None)
         assert embedder is not None  # loaded above whenever there is work to do
         retriever = build_retriever(cv_text, embedder)
-        usage = getattr(llm, "usage", None)  # only OllamaClient counts tokens
+        usage = getattr(llm, "usage", None)  # local and cloud clients count tokens
         before = asdict(usage) if usage is not None else None
         pair_started = time.monotonic()
 
         if pair["kind"] == "negative":
-            result = _run_negative(pair, llm, retriever, cv_text, jd_text)
+            result = _run_negative(pair, pair_llm, retriever, cv_text, jd_text)
         else:
             result = _run_labelled(
-                pair, llm, retriever, cv_text, jd_text, embedder, check_extraction=not args.no_extraction
+                pair, pair_llm, retriever, cv_text, jd_text, embedder, check_extraction=not args.no_extraction
             )
         result["seconds"] = round(time.monotonic() - pair_started, 1)
         if usage is not None and before is not None:
