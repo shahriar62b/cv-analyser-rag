@@ -8,7 +8,12 @@ from cv_analyser.embedder import SentenceTransformerEmbedder
 from cv_analyser.exceptions import CVAnalyserError
 from cv_analyser.extraction import extract_requirements_llm
 from cv_analyser.job_description import load_job_description
-from cv_analyser.llm.factory import create_llm_client, create_local_client, is_local_provider
+from cv_analyser.llm.factory import (
+    create_llm_client,
+    create_local_client,
+    is_local_provider,
+    judge_batch_size,
+)
 from cv_analyser.loaders.dispatcher import load_document
 from cv_analyser.privacy import PrivateLLMClient, protect_for_cloud
 from cv_analyser.prompts import EXTRACT_SYSTEM
@@ -73,6 +78,7 @@ def main() -> int:
             progress=progress,
             requirements=requirements,
             on_verdicts=print_verdicts,
+            batch_size=judge_batch_size(),
         )
     except CVAnalyserError as exc:
         print(f"Error: {exc}", file=sys.stderr)

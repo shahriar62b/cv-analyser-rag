@@ -21,6 +21,7 @@ Rules:
 - Skip company descriptions, benefits, salary and application instructions."""
 
 JUDGE_SYSTEM = """You check whether a CV meets job requirements, using only the CV excerpts given.
+The excerpts are numbered (E1, E2, ...); each requirement lists the ones found for it.
 For each requirement, in this order:
 1. number: the requirement number
 2. evidence: the line from the excerpts that comes closest to the requirement, copied

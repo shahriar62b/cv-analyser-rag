@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from cv_analyser.exceptions import LLMError
 from cv_analyser.llm import openai_compatible
-from cv_analyser.llm.factory import create_llm_client, is_local_provider
+from cv_analyser.llm.factory import create_llm_client, is_local_provider, judge_batch_size
 from cv_analyser.llm.openai_compatible import OpenAICompatibleClient
 from cv_analyser.privacy import PrivateLLMClient, protect_for_cloud
 
@@ -193,3 +193,53 @@ def test_protect_for_cloud_masks_the_cv_and_guards_the_client(network):
     assert "Python, SQL" in masked_cv
     sent = network["requests"][0]["payload"]["messages"][1]["content"]
     assert "Nadia" not in sent and "nadia@example.com" not in sent
+
+
+def test_gpt_oss_models_think_at_low_effort_by_default(network):
+    network["replies"] = [_reply('{"skill": "Python", "years": 3}')]
+    client, _ = _client()
+
+    client.generate_structured("s", "u", _Answer)
+
+    assert network["requests"][0]["payload"]["reasoning_effort"] == "low"
+
+
+def test_reasoning_effort_is_not_sent_to_models_that_may_not_accept_it(network):
+    network["replies"] = [_reply('{"skill": "Python", "years": 3}')]
+    client, _ = _client(model="qwen/qwen3.8-27b")
+
+    client.generate_structured("s", "u", _Answer)
+
+    assert "reasoning_effort" not in network["requests"][0]["payload"]
+
+
+def test_reasoning_effort_can_be_set_from_environment(monkeypatch, network):
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", SECRET)
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "High")
+    monkeypatch.delenv("LLM_MODEL", raising=False)
+    network["replies"] = [_reply('{"skill": "Python", "years": 3}')]
+
+    create_llm_client().generate_structured("s", "u", _Answer)
+
+    assert network["requests"][0]["payload"]["reasoning_effort"] == "high"
+
+
+def test_schema_in_the_prompt_is_compact(network):
+    network["replies"] = [_reply('{"skill": "Python", "years": 3}')]
+    client, _ = _client()
+
+    client.generate_structured("s", "u", _Answer)
+
+    system = network["requests"][0]["payload"]["messages"][0]["content"]
+    schema = system.split("JSON schema:\n", 1)[1]
+    assert '"title"' not in schema
+    assert ": " not in schema and ", " not in schema
+    assert json.loads(schema)["required"] == ["skill", "years"]
+
+
+def test_cloud_judges_a_whole_job_ad_per_call(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    assert judge_batch_size() == 15
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    assert judge_batch_size() == 5

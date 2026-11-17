@@ -27,9 +27,11 @@ def analyse_cv(
     progress: Progress | None = None,
     requirements: list[Requirement] | None = None,
     on_verdicts: VerdictSink | None = None,
+    batch_size: int = 5,
 ) -> CVReport:
     """Pass `requirements` to reuse an earlier extraction of the same job
-    description; extraction is then skipped."""
+    description; extraction is then skipped. `batch_size` is how many
+    requirements are judged per LLM call (see `factory.judge_batch_size`)."""
     report_progress = progress or (lambda message: None)
 
     retriever = build_retriever(cv_text, embedder)
@@ -39,7 +41,13 @@ def analyse_cv(
         requirements = extract_requirements_llm(llm, job_description)
 
     verdicts = judge_requirements(
-        llm, retriever, cv_text, requirements, progress=report_progress, on_verdicts=on_verdicts
+        llm,
+        retriever,
+        cv_text,
+        requirements,
+        batch_size=batch_size,
+        progress=report_progress,
+        on_verdicts=on_verdicts,
     )
 
     report_progress("Writing the summary")

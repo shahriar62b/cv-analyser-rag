@@ -58,6 +58,7 @@ class OpenAICompatibleClient:
         api_key: str | None = None,
         timeout: float = 120.0,
         sleep: Callable[[float], None] = time.sleep,
+        reasoning_effort: str | None = None,
     ) -> None:
         if provider not in PROVIDERS:
             raise LLMError(f"Unknown cloud provider '{provider}'. Supported: {', '.join(PROVIDERS)}")
@@ -75,6 +76,9 @@ class OpenAICompatibleClient:
         self._timeout = timeout
         # Injected so tests can skip real waiting.
         self._sleep = sleep
+        # Reasoning models "think" before answering, and those hidden tokens are
+        # billed like any others: on gpt-oss they were 73% of the output.
+        self._reasoning_effort = reasoning_effort or _default_reasoning_effort(self._model)
         self.usage = Usage()
 
     @property
@@ -87,7 +91,7 @@ class OpenAICompatibleClient:
         # and Pydantic checks the answer, with one retry that shows the error.
         instructions = (
             f"{system}\n\nReply with only a JSON object that matches this JSON schema:\n"
-            f"{json.dumps(schema.model_json_schema())}"
+            f"{compact_schema(schema.model_json_schema())}"
         )
         messages = [
             {"role": "system", "content": instructions},
@@ -113,14 +117,15 @@ class OpenAICompatibleClient:
                 ) from exc
 
     def _chat(self, messages: list[dict[str, str]]) -> str:
-        body = self._post(
-            {
-                "model": self._model,
-                "messages": messages,
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-            }
-        )
+        payload: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+        }
+        if self._reasoning_effort:
+            payload["reasoning_effort"] = self._reasoning_effort
+        body = self._post(payload)
         usage = body.get("usage") or {}
         self.usage.calls += 1
         self.usage.prompt_tokens += usage.get("prompt_tokens", 0)
@@ -166,3 +171,27 @@ def _wait_seconds(retry_after: str | None) -> float:
         return min(float(retry_after), _MAX_WAIT_SECONDS) if retry_after else _DEFAULT_WAIT_SECONDS
     except ValueError:
         return _DEFAULT_WAIT_SECONDS
+
+
+# Models known to accept "reasoning_effort", and the level that keeps accuracy
+# while thinking least (measured on the eval set; see the README).
+_REASONING_DEFAULTS = {"openai/gpt-oss-": "low"}
+
+
+def _default_reasoning_effort(model: str) -> str | None:
+    return next((level for prefix, level in _REASONING_DEFAULTS.items() if model.startswith(prefix)), None)
+
+
+def compact_schema(schema: dict[str, Any]) -> str:
+    """The JSON schema as short as possible: no "title" entries (Pydantic adds
+    one per field, repeating the field name) and no spaces. It is sent with
+    every request, so every character counts."""
+
+    def strip(node: Any) -> Any:
+        if isinstance(node, dict):
+            return {k: strip(v) for k, v in node.items() if not (k == "title" and isinstance(v, str))}
+        if isinstance(node, list):
+            return [strip(v) for v in node]
+        return node
+
+    return json.dumps(strip(schema), separators=(",", ":"))
