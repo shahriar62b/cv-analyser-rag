@@ -289,7 +289,12 @@ def _summarise(results):
             "calls": int(total["calls"]),
             "prompt_tokens": int(total["prompt_tokens"]),
             "output_tokens": int(total["output_tokens"]),
-            "output_tokens_per_second": round(total["output_tokens"] / max(total["output_seconds"], 0.1), 1),
+            # Cloud providers don't report generation time, so there is no rate to show.
+            "output_tokens_per_second": (
+                round(total["output_tokens"] / total["output_seconds"], 1)
+                if total["output_seconds"]
+                else None
+            ),
             "load_seconds": round(total["load_seconds"]),
             "prompt_seconds": round(total["prompt_seconds"]),
             "output_seconds": round(total["output_seconds"]),
