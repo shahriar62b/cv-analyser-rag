@@ -7,7 +7,7 @@ Typical use:
     report = analyse_cv(redacted.text, job_description, llm, embedder)
 """
 
-from cv_analyser.privacy.guard import OutboundGuard, PrivateLLMClient
+from cv_analyser.privacy.guard import OutboundGuard, PrivateLLMClient, protect_for_cloud
 from cv_analyser.privacy.redactor import Identity, RedactedCV, redact_cv
 
-__all__ = ["Identity", "OutboundGuard", "PrivateLLMClient", "RedactedCV", "redact_cv"]
+__all__ = ["Identity", "OutboundGuard", "PrivateLLMClient", "RedactedCV", "protect_for_cloud", "redact_cv"]

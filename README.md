@@ -47,6 +47,29 @@ The 7B model (4-bit, about 4.7 GB) is the largest that runs at a usable speed on
 a CPU-only laptop with 16 GB RAM. On a weaker machine use `LLM_MODEL=qwen2.5:3b`:
 it is about twice as fast but less accurate and less consistent.
 
+### Cloud LLM (optional, free tiers)
+
+Larger models run in the cloud through any provider that speaks the OpenAI
+chat format. Set the provider and its API key as environment variables; never
+put a key in a file in this repository.
+
+| `LLM_PROVIDER` | Key variable         | Default model                            |
+|----------------|----------------------|------------------------------------------|
+| `groq`         | `GROQ_API_KEY`       | `llama-3.3-70b-versatile`                |
+| `openrouter`   | `OPENROUTER_API_KEY` | `meta-llama/llama-3.3-70b-instruct:free` |
+| `gemini`       | `GEMINI_API_KEY`     | `gemini-2.5-flash`                       |
+
+```powershell
+setx GROQ_API_KEY "your-key"        # once; then open a new terminal
+$env:LLM_PROVIDER = "groq"          # for this terminal session
+python scripts/analyse_cv.py cv.pdf job.txt
+```
+
+With a cloud provider, the CV is always masked first and every request passes
+the privacy guard (see "Privacy" below); a request that still holds personal
+data is answered by the local Ollama model instead. Free tiers have daily
+limits (roughly 10 analyses a day) and may keep what they receive.
+
 ## Usage
 
 ```bash
@@ -137,4 +160,5 @@ pytest
 Implement a `model` property and `generate_structured(system, user, schema)` (see
 `src/cv_analyser/llm/base.py`) and register it in
 `src/cv_analyser/llm/factory.py`. The rest of the code only depends on that
-one method.
+interface. A provider with an OpenAI-compatible API only needs an entry in
+`PROVIDERS` in `src/cv_analyser/llm/openai_compatible.py`.
