@@ -1,15 +1,13 @@
 import pytest
 
-from cv_analyser.analysis import (
-    analyse_cv,
-    compute_score,
-    extract_requirements_llm,
-    judge_requirements,
-    summarise,
-)
+from cv_analyser.analysis import analyse_cv
 from cv_analyser.chunker import Chunk
+from cv_analyser.extraction import extract_requirements_llm
+from cv_analyser.judging import judge_requirements
 from cv_analyser.report import Requirement, RequirementVerdict
 from cv_analyser.retriever import CVRetriever
+from cv_analyser.scoring import compute_score
+from cv_analyser.summary import summarise
 
 CV_TEXT = """Experience
 Built REST APIs in Python and Django for 4 years.

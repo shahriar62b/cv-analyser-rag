@@ -3,12 +3,14 @@ import sys
 import time
 from pathlib import Path
 
-from cv_analyser.analysis import EXTRACT_SYSTEM, analyse_cv, extract_requirements_llm
+from cv_analyser.analysis import analyse_cv
 from cv_analyser.embedder import SentenceTransformerEmbedder
 from cv_analyser.exceptions import CVAnalyserError
+from cv_analyser.extraction import extract_requirements_llm
 from cv_analyser.job_description import load_job_description
 from cv_analyser.llm.factory import create_llm_client
 from cv_analyser.loaders.dispatcher import load_document
+from cv_analyser.prompts import EXTRACT_SYSTEM
 from cv_analyser.report import CVReport, RequirementVerdict
 from cv_analyser.requirements_cache import RequirementsCache
 
