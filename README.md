@@ -68,8 +68,14 @@ python scripts/analyse_cv.py cv.pdf job.txt
 With a cloud provider, the CV is always masked first and every request passes
 the privacy guard (see "Privacy" below); a request that still holds personal
 data is answered by the local Ollama model instead. Free tiers have daily
-limits (roughly 10 analyses a day) and may keep what they receive. Model
-catalogues change often; pick another model with `LLM_MODEL`.
+limits and may keep what they receive. Model catalogues change often; pick
+another model with `LLM_MODEL`.
+
+Token use per analysis with `openai/gpt-oss-120b` is about 5,200 (measured on
+the eval set, with the same accuracy as the default settings at about 10,900):
+cloud models judge all requirements in one call, shared CV excerpts are sent
+once, the JSON schema is compacted, and gpt-oss "thinks" at low effort
+(`LLM_REASONING_EFFORT=low|medium|high` to change it).
 
 ## Usage
 

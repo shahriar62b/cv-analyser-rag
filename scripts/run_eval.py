@@ -34,7 +34,7 @@ from cv_analyser.extraction import extract_requirements_llm
 from cv_analyser.job_description import load_job_description
 from cv_analyser.judging import judge_requirements
 from cv_analyser.llm.base import LLMClient
-from cv_analyser.llm.factory import create_llm_client, is_local_provider
+from cv_analyser.llm.factory import create_llm_client, is_local_provider, judge_batch_size
 from cv_analyser.loaders.dispatcher import load_document
 from cv_analyser.privacy import protect_for_cloud
 from cv_analyser.report import Requirement
@@ -181,7 +181,7 @@ def _run_labelled(pair, llm, retriever, cv_text, jd_text, embedder, check_extrac
         Requirement(text=r["text"], must_have=r["must_have"], mandatory=r.get("mandatory", False))
         for r in rows
     ]
-    verdicts = judge_requirements(llm, retriever, cv_text, requirements)
+    verdicts = judge_requirements(llm, retriever, cv_text, requirements, batch_size=judge_batch_size())
 
     graded = []
     for row, verdict in zip(rows, verdicts, strict=True):
@@ -217,7 +217,7 @@ def _run_labelled(pair, llm, retriever, cv_text, jd_text, embedder, check_extrac
 
 def _run_negative(pair, llm, retriever, cv_text, jd_text):
     requirements = extract_requirements_llm(llm, jd_text)
-    verdicts = judge_requirements(llm, retriever, cv_text, requirements)
+    verdicts = judge_requirements(llm, retriever, cv_text, requirements, batch_size=judge_batch_size())
     score = compute_score(verdicts)
     return {
         "cv": pair["cv"],

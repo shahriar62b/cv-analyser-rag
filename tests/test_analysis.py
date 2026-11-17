@@ -97,6 +97,28 @@ def test_judge_batches_and_sends_excerpts(make_fake_llm, retriever):
     assert "Requirement 3: Kubernetes" in second_prompt
 
 
+def test_shared_excerpts_are_sent_once_and_referenced_by_number(make_fake_llm, retriever):
+    requirements = [Requirement(text=t) for t in ("Python APIs", "Python REST APIs")]
+    llm = make_fake_llm([{"judgements": [_judgement(1), _judgement(2)]}])
+
+    judge_requirements(llm, retriever, CV_TEXT, requirements)
+
+    prompt = llm.calls[0][1]
+    assert prompt.count("Built REST APIs") == 1
+    assert "Requirement 1: Python APIs\nRelevant excerpts: E1" in prompt
+    assert "Requirement 2: Python REST APIs\nRelevant excerpts: E1" in prompt
+
+
+def test_copied_excerpt_number_is_stripped_from_quotes(make_fake_llm, retriever):
+    llm = make_fake_llm(
+        [{"judgements": [_judgement(1, evidence="E1 [experience] Built REST APIs in Python")]}]
+    )
+
+    [verdict] = judge_requirements(llm, retriever, CV_TEXT, [Requirement(text="Python APIs")])
+
+    assert verdict.evidence == "Built REST APIs in Python"
+
+
 def test_judge_verifies_quoted_evidence(make_fake_llm, retriever):
     requirements = [Requirement(text="Python"), Requirement(text="Leadership")]
     llm = make_fake_llm(

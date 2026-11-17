@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from pydantic import BaseModel
 
+from cv_analyser.chunker import Chunk
 from cv_analyser.llm.base import LLMClient
 from cv_analyser.prompts import JUDGE_SYSTEM
 from cv_analyser.report import MatchStatus, Requirement, RequirementVerdict
@@ -79,15 +80,9 @@ def _judge_batch(
     numbers: list[int],
     top_k: int,
 ) -> dict[int, _Judgement]:
-    blocks = []
-    for number in numbers:
-        text = requirements[number - 1].text
-        excerpts = "\n".join(
-            f"[{hit.chunk.section}] {hit.chunk.text}" for hit in retriever.retrieve(text, top_k)
-        )
-        blocks.append(f"Requirement {number}: {text}\nCV excerpts:\n{excerpts or '(none)'}")
-
-    result = llm.generate_structured(JUDGE_SYSTEM, "\n\n".join(blocks), _Judgements)
+    result = llm.generate_structured(
+        JUDGE_SYSTEM, _batch_prompt(retriever, requirements, numbers, top_k), _Judgements
+    )
     wanted = set(numbers)
     found: dict[int, _Judgement] = {}
     for judgement in result.judgements:
@@ -120,9 +115,33 @@ def _to_verdict(requirement: Requirement, judgement: _Judgement | None, cv_text:
     )
 
 
+def _batch_prompt(
+    retriever: CVRetriever, requirements: list[Requirement], numbers: list[int], top_k: int
+) -> str:
+    """List each retrieved CV excerpt once, then each requirement with the
+    numbers of its excerpts.
+
+    Related requirements retrieve the same lines ("Python" and "ETL pipelines"
+    both find the ETL bullet). Writing the excerpts out per requirement repeated
+    them; numbering them once cuts the prompt without hiding anything.
+    """
+    excerpt_ids: dict[Chunk, int] = {}
+    requirement_lines = []
+    for number in numbers:
+        text = requirements[number - 1].text
+        ids = [
+            excerpt_ids.setdefault(hit.chunk, len(excerpt_ids) + 1) for hit in retriever.retrieve(text, top_k)
+        ]
+        refs = ", ".join(f"E{i}" for i in ids) or "(none)"
+        requirement_lines.append(f"Requirement {number}: {text}\nRelevant excerpts: {refs}")
+    excerpts = "\n".join(f"E{i} [{chunk.section}] {chunk.text}" for chunk, i in excerpt_ids.items())
+    return f"CV excerpts:\n{excerpts or '(none)'}\n\n" + "\n\n".join(requirement_lines)
+
+
 def _clean_quote(text: str) -> str:
-    # Models sometimes copy the "[section]" label or bullet marker from the prompt.
-    return re.sub(r"^(\[[a-z]+\]\s*)?([-*•]\s*)?", "", text.strip())
+    # Models sometimes copy the "E3" excerpt number, "[section]" label or bullet
+    # marker from the prompt.
+    return re.sub(r"^(E\d+\s*)?(\[[a-z]+\]\s*)?([-*•]\s*)?", "", text.strip())
 
 
 def _normalise(text: str) -> str:
