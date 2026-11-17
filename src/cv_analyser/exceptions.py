@@ -16,3 +16,7 @@ class EmptyDocumentError(CVAnalyserError):
 
 class LLMError(CVAnalyserError):
     """The LLM could not be reached or returned output we cannot use."""
+
+
+class PrivacyLeakError(CVAnalyserError):
+    """A request to a cloud model still contained the candidate's personal data."""

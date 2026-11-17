@@ -90,6 +90,28 @@ python scripts/run_eval.py --out data/eval/results/quick.json --pairs cv_a --no-
 Each finished pair is saved to a checkpoint next to `--out`, so a long run can be
 split into batches and continued later; the model is unloaded after each batch.
 
+## Privacy: masking a CV before a cloud model sees it
+
+Local models keep everything on your machine. Before a cloud model is used,
+`cv_analyser.privacy` removes the candidate's personal data:
+
+- the contact header, personal-information, references and declaration sections are dropped
+- emails, links, phone numbers and labelled fields (date of birth, NID, address...) are masked
+- the candidate's name is masked wherever it appears, in any case or script
+- every request then passes an outbound guard that blocks it if any known personal
+  data is still present, and falls back to the local model
+
+Preview exactly what would be sent (nothing is sent by this command):
+
+```bash
+python scripts/redact_cv.py path/to/cv.pdf
+python scripts/redact_cv.py path/to/cv.docx --mask "Hometown" --mask "Small Employer Ltd"
+```
+
+Masking removes direct identifiers, not every indirect clue (a rare job title at a
+small company can still point to someone), so get consent before using real CVs
+with a cloud model.
+
 ## Tests
 
 ```bash
