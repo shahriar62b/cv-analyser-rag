@@ -6,6 +6,11 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class LLMClient(Protocol):
+    @property
+    def model(self) -> str:
+        """Name of the model answering, used in cache keys and reports."""
+        ...
+
     def generate_structured(self, system: str, user: str, schema: type[T]) -> T:
         """Ask the model a question and return its answer validated as `schema`.
 

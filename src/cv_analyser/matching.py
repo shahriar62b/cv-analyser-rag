@@ -14,6 +14,5 @@ def match_requirements(
     retriever: CVRetriever, requirements: list[str], top_k: int = 2
 ) -> list[RequirementMatch]:
     return [
-        RequirementMatch(requirement, retriever.retrieve(requirement, top_k))
-        for requirement in requirements
+        RequirementMatch(requirement, retriever.retrieve(requirement, top_k)) for requirement in requirements
     ]

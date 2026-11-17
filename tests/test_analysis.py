@@ -54,8 +54,15 @@ def retriever(fake_embedder):
 
 def test_extract_uses_llm_requirements(make_fake_llm):
     llm = make_fake_llm(
-        [{"requirements": [{"text": "Python", "must_have": True}, {"text": " ", "must_have": True},
-                           {"text": "Docker", "must_have": False}]}]
+        [
+            {
+                "requirements": [
+                    {"text": "Python", "must_have": True},
+                    {"text": " ", "must_have": True},
+                    {"text": "Docker", "must_have": False},
+                ]
+            }
+        ]
     )
 
     requirements = extract_requirements_llm(llm, "We need Python. Docker is a plus.")
@@ -163,10 +170,13 @@ def test_compute_score(verdicts, expected):
 def test_analyse_cv_end_to_end(make_fake_llm, fake_embedder):
     llm = make_fake_llm(
         [
-            {"requirements": [{"text": "Python APIs", "must_have": True},
-                              {"text": "Kubernetes", "must_have": False}]},
-            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"),
-                            _judgement(2, "missing")]},
+            {
+                "requirements": [
+                    {"text": "Python APIs", "must_have": True},
+                    {"text": "Kubernetes", "must_have": False},
+                ]
+            },
+            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"), _judgement(2, "missing")]},
             SUMMARY,
         ]
     )
@@ -242,8 +252,12 @@ def test_given_requirements_skip_extraction(make_fake_llm, fake_embedder):
     messages = []
 
     report = analyse_cv(
-        CV_TEXT, "job text", llm, fake_embedder,
-        progress=messages.append, requirements=[Requirement(text="Go")],
+        CV_TEXT,
+        "job text",
+        llm,
+        fake_embedder,
+        progress=messages.append,
+        requirements=[Requirement(text="Go")],
     )
 
     assert len(llm.calls) == 2
@@ -254,10 +268,13 @@ def test_given_requirements_skip_extraction(make_fake_llm, fake_embedder):
 def test_unmet_mandatory_is_flagged_without_changing_the_score(make_fake_llm, fake_embedder):
     llm = make_fake_llm(
         [
-            {"requirements": [{"text": "Python APIs", "must_have": True},
-                              {"text": "Inditex buyers", "must_have": True, "mandatory": True}]},
-            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"),
-                            _judgement(2, "missing")]},
+            {
+                "requirements": [
+                    {"text": "Python APIs", "must_have": True},
+                    {"text": "Inditex buyers", "must_have": True, "mandatory": True},
+                ]
+            },
+            {"judgements": [_judgement(1, evidence="Built REST APIs in Python"), _judgement(2, "missing")]},
             SUMMARY,
         ]
     )
@@ -286,12 +303,16 @@ def test_summary_prompt_has_no_mandatory_line_when_all_are_met(make_fake_llm):
         ("Inditex buyer experience is mandatory. Python is required.", [True, False]),
     ],
 )
-def test_mandatory_flag_is_kept_only_when_the_job_uses_mandatory_wording(
-    make_fake_llm, job_text, expected
-):
+def test_mandatory_flag_is_kept_only_when_the_job_uses_mandatory_wording(make_fake_llm, job_text, expected):
     llm = make_fake_llm(
-        [{"requirements": [{"text": "Inditex buyers", "must_have": True, "mandatory": True},
-                           {"text": "Python", "must_have": True, "mandatory": False}]}]
+        [
+            {
+                "requirements": [
+                    {"text": "Inditex buyers", "must_have": True, "mandatory": True},
+                    {"text": "Python", "must_have": True, "mandatory": False},
+                ]
+            }
+        ]
     )
 
     requirements = extract_requirements_llm(llm, job_text)

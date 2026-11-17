@@ -98,9 +98,21 @@ pytest -m slow      # also load the real embedding model
 pytest -m ollama    # call the local Ollama server
 ```
 
+## Code checks
+
+The same checks run on GitHub for every push and pull request
+(`.github/workflows/ci.yml`). Run them locally before committing:
+
+```bash
+ruff check .          # lint: likely bugs, unused code, import order
+ruff format .         # reformat the code (use --check to only report)
+mypy                  # type check src/ and scripts/
+pytest
+```
+
 ## Adding another LLM provider
 
-Implement `generate_structured(system, user, schema)` (see
+Implement a `model` property and `generate_structured(system, user, schema)` (see
 `src/cv_analyser/llm/base.py`) and register it in
 `src/cv_analyser/llm/factory.py`. The rest of the code only depends on that
 one method.

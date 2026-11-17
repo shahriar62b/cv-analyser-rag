@@ -24,6 +24,4 @@ def test_plain_lines_are_used_when_there_are_no_bullets():
 
 
 def test_one_word_bullets_are_dropped():
-    assert extract_requirements("- Python\n- Build REST APIs fast") == [
-        "Build REST APIs fast"
-    ]
+    assert extract_requirements("- Python\n- Build REST APIs fast") == ["Build REST APIs fast"]

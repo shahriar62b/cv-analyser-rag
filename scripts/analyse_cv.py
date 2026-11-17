@@ -21,7 +21,9 @@ def main() -> int:
     parser.add_argument("jd", type=Path, help="Job description (TXT, PDF or DOCX)")
     parser.add_argument("--json", type=Path, help="Also save the full report as JSON here")
     parser.add_argument(
-        "--cache-dir", type=Path, default=Path("data/cache/requirements"),
+        "--cache-dir",
+        type=Path,
+        default=Path("data/cache/requirements"),
         help="Where extracted job requirements are remembered (default: %(default)s)",
     )
     parser.add_argument("--no-cache", action="store_true", help="Always extract requirements again")

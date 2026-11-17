@@ -43,9 +43,7 @@ def test_empty_store_returns_no_results():
 
 def test_mismatched_lengths_raise():
     with pytest.raises(ValueError):
-        InMemoryVectorStore().add(
-            [make_chunk("a", 0)], np.array([[1.0, 0.0], [0.0, 1.0]])
-        )
+        InMemoryVectorStore().add([make_chunk("a", 0)], np.array([[1.0, 0.0], [0.0, 1.0]]))
 
 
 def test_non_positive_top_k_raises():

@@ -105,9 +105,7 @@ class OllamaClient:
             detail = exc.read().decode("utf-8", errors="replace")
             raise LLMError(f"Ollama returned HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
-            raise LLMError(
-                f"Cannot reach Ollama at {self._base_url}. Is it installed and running?"
-            ) from exc
+            raise LLMError(f"Cannot reach Ollama at {self._base_url}. Is it installed and running?") from exc
         except TimeoutError as exc:
             raise LLMError(
                 f"Ollama did not answer within {self._timeout:.0f}s (model '{self._model}')"

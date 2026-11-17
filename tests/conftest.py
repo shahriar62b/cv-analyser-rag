@@ -27,6 +27,8 @@ def fake_embedder() -> _FakeEmbedder:
 class _FakeLLM:
     """Returns pre-set answers in order and records every call it receives."""
 
+    model = "fake"
+
     def __init__(self, responses: list[dict]) -> None:
         self._responses = list(responses)
         self.calls: list[tuple[str, str, type]] = []

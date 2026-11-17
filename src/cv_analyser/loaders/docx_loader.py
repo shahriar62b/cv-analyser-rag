@@ -9,7 +9,7 @@ from cv_analyser.exceptions import CorruptedFileError, EmptyDocumentError
 
 def load_docx(path: Path) -> str:
     try:
-        document = Document(path)
+        document = Document(str(path))
     except (PackageNotFoundError, BadZipFile) as exc:
         raise CorruptedFileError(f"Cannot read DOCX: {path.name}") from exc
 

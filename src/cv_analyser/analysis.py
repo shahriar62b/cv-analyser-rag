@@ -169,9 +169,7 @@ def judge_requirements(
         found = _judge_batch(llm, retriever, requirements, numbers, top_k)
         judgements.update(found)
         if on_verdicts and found:
-            on_verdicts([
-                _to_verdict(requirements[n - 1], found[n], cv_text) for n in sorted(found)
-            ])
+            on_verdicts([_to_verdict(requirements[n - 1], found[n], cv_text) for n in sorted(found)])
 
     total_batches = -(-len(requirements) // batch_size)
     for start in range(0, len(requirements), batch_size):
@@ -266,9 +264,7 @@ def _judge_batch(
     return found
 
 
-def _to_verdict(
-    requirement: Requirement, judgement: _Judgement | None, cv_text: str
-) -> RequirementVerdict:
+def _to_verdict(requirement: Requirement, judgement: _Judgement | None, cv_text: str) -> RequirementVerdict:
     if judgement is None:
         return RequirementVerdict(
             requirement=requirement,
