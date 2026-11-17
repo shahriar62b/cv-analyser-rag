@@ -78,8 +78,9 @@ def test_sends_openai_style_request_and_parses_answer(network):
     request = network["requests"][0]
     assert request["url"] == "https://api.groq.com/openai/v1/chat/completions"
     assert request["headers"]["Authorization"] == f"Bearer {SECRET}"
+    assert request["headers"]["User-agent"] == "cv-analyser/0.1"  # not Python-urllib
     payload = request["payload"]
-    assert payload["model"] == "llama-3.3-70b-versatile"
+    assert payload["model"] == "openai/gpt-oss-120b"
     assert payload["temperature"] == 0
     assert payload["response_format"] == {"type": "json_object"}
     system = payload["messages"][0]["content"]
@@ -132,6 +133,15 @@ def test_rate_limit_waits_as_told_and_retries(network):
     client.generate_structured("s", "u", _Answer)
 
     assert waits == [7.0]
+
+
+def test_over_capacity_is_retried(network):
+    network["replies"] = [_http_error(503), _reply('{"skill": "Python", "years": 3}')]
+    client, waits = _client()
+
+    client.generate_structured("s", "u", _Answer)
+
+    assert waits == [20.0]  # no Retry-After header, so the default wait
 
 
 def test_rate_limit_gives_up_after_three_retries(network):

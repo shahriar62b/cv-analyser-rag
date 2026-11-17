@@ -30,7 +30,9 @@ class Provider:
 
 
 PROVIDERS = {
-    "groq": Provider("https://api.groq.com/openai/v1", "GROQ_API_KEY", "llama-3.3-70b-versatile"),
+    # Model catalogues change often: list what a provider offers with its /models
+    # endpoint, and override the default with LLM_MODEL.
+    "groq": Provider("https://api.groq.com/openai/v1", "GROQ_API_KEY", "openai/gpt-oss-120b"),
     "openrouter": Provider(
         "https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "meta-llama/llama-3.3-70b-instruct:free"
     ),
@@ -39,10 +41,13 @@ PROVIDERS = {
     ),
 }
 
-# Free tiers limit requests per minute; on HTTP 429 wait and try again this many times.
-_RATE_LIMIT_RETRIES = 3
+# Free tiers limit requests per minute (HTTP 429), and busy models are briefly
+# "over capacity" (HTTP 503); both are temporary, so wait and try again.
+_RETRY_CODES = {429, 503}
+_RETRIES = 3
 _DEFAULT_WAIT_SECONDS = 20.0
 _MAX_WAIT_SECONDS = 120.0
+_USER_AGENT = "cv-analyser/0.1"
 
 
 class OpenAICompatibleClient:
@@ -133,15 +138,18 @@ class OpenAICompatibleClient:
             headers={
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self._api_key}",
+                # Cloudflare, in front of several providers, rejects Python's
+                # default "Python-urllib" agent (error 1010).
+                "User-Agent": _USER_AGENT,
             },
         )
-        for attempt in range(_RATE_LIMIT_RETRIES + 1):
+        for attempt in range(_RETRIES + 1):
             try:
                 with urllib.request.urlopen(request, timeout=self._timeout) as response:
                     result: dict[str, Any] = json.loads(response.read())
                     return result
             except urllib.error.HTTPError as exc:
-                if exc.code == 429 and attempt < _RATE_LIMIT_RETRIES:
+                if exc.code in _RETRY_CODES and attempt < _RETRIES:
                     self._sleep(_wait_seconds(exc.headers.get("Retry-After")))
                     continue
                 detail = exc.read().decode("utf-8", errors="replace")[:500]

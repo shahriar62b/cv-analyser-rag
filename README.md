@@ -55,7 +55,7 @@ put a key in a file in this repository.
 
 | `LLM_PROVIDER` | Key variable         | Default model                            |
 |----------------|----------------------|------------------------------------------|
-| `groq`         | `GROQ_API_KEY`       | `llama-3.3-70b-versatile`                |
+| `groq`         | `GROQ_API_KEY`       | `openai/gpt-oss-120b`                    |
 | `openrouter`   | `OPENROUTER_API_KEY` | `meta-llama/llama-3.3-70b-instruct:free` |
 | `gemini`       | `GEMINI_API_KEY`     | `gemini-2.5-flash`                       |
 
@@ -68,7 +68,8 @@ python scripts/analyse_cv.py cv.pdf job.txt
 With a cloud provider, the CV is always masked first and every request passes
 the privacy guard (see "Privacy" below); a request that still holds personal
 data is answered by the local Ollama model instead. Free tiers have daily
-limits (roughly 10 analyses a day) and may keep what they receive.
+limits (roughly 10 analyses a day) and may keep what they receive. Model
+catalogues change often; pick another model with `LLM_MODEL`.
 
 ## Usage
 
