@@ -120,6 +120,14 @@ python scripts/run_eval.py --out data/eval/results/quick.json --pairs cv_a --no-
 Each finished pair is saved to a checkpoint next to `--out`, so a long run can be
 split into batches and continued later; the model is unloaded after each batch.
 
+### Running the eval on a free Kaggle GPU
+
+`notebooks/kaggle_eval.ipynb` runs the same local-model eval (Ollama with
+`qwen2.5:7b`, the same code from GitHub) on Kaggle's free GPU instead of a
+laptop CPU. Upload the fictional eval CVs, `answer_key.json` and the job ads as a
+private Kaggle dataset, attach it, turn on the GPU and Internet in the notebook
+settings, and run all cells. Never upload real people's CVs to Kaggle.
+
 ## Privacy: masking a CV before a cloud model sees it
 
 Local models keep everything on your machine. Before a cloud model is used,
