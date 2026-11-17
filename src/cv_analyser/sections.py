@@ -28,6 +28,13 @@ _HEADINGS = {
     ),
     "references": ("references", "reference", "referees"),
     "declaration": ("declaration",),
+    "contact": ("contact", "contact information", "contact details", "contact info"),
+    "activities": (
+        "activities",
+        "extracurricular activities",
+        "extra-curricular activities",
+        "co-curricular activities",
+    ),
 }
 
 _HEADING_LOOKUP = {alias: name for name, aliases in _HEADINGS.items() for alias in aliases}

@@ -4,6 +4,7 @@ import time
 from pathlib import Path
 
 from cv_analyser.analysis import analyse_cv
+from cv_analyser.console import use_utf8_output
 from cv_analyser.embedder import SentenceTransformerEmbedder
 from cv_analyser.exceptions import CVAnalyserError
 from cv_analyser.extraction import extract_requirements_llm
@@ -24,6 +25,7 @@ _STATUS_ICON = {"met": "[x]", "partial": "[~]", "missing": "[ ]"}
 
 
 def main() -> int:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description="Analyse a CV against a job description.")
     parser.add_argument("cv", type=Path, help="CV file (PDF or DOCX)")
     parser.add_argument("jd", type=Path, help="Job description (TXT, PDF or DOCX)")
@@ -40,6 +42,11 @@ def main() -> int:
         action="append",
         default=[],
         help="With a cloud model: extra word or phrase to mask in the CV (can be repeated)",
+    )
+    parser.add_argument(
+        "--show-sent",
+        type=Path,
+        help="With a cloud model: save every request that was sent to this local file, to check it",
     )
     args = parser.parse_args()
 
@@ -84,6 +91,9 @@ def main() -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
+    # Saved before printing, so it survives any problem with the report.
+    if isinstance(llm, PrivateLLMClient) and args.show_sent:
+        save_sent(llm, args.show_sent)
     print_report(report)
     if isinstance(llm, PrivateLLMClient) and llm.blocked_requests:
         print(
@@ -94,6 +104,16 @@ def main() -> int:
         args.json.write_text(report.model_dump_json(indent=2), encoding="utf-8")
         print(f"\nSaved JSON report to {args.json}")
     return 0
+
+
+def save_sent(llm: PrivateLLMClient, path: Path) -> None:
+    parts = [
+        f"===== Request {i} of {len(llm.sent)} to {llm.model} =====\n"
+        f"--- instructions ---\n{system}\n--- content ---\n{user}\n"
+        for i, (system, user) in enumerate(llm.sent, start=1)
+    ]
+    path.write_text("\n".join(parts), encoding="utf-8")
+    print(f"\nSaved the {len(llm.sent)} request(s) sent to the cloud model to {path}")
 
 
 def print_verdicts(verdicts: list[RequirementVerdict]) -> None:

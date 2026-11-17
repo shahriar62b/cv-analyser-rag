@@ -13,12 +13,14 @@ import argparse
 import sys
 from pathlib import Path
 
+from cv_analyser.console import use_utf8_output
 from cv_analyser.exceptions import CVAnalyserError
 from cv_analyser.loaders.dispatcher import load_document
 from cv_analyser.privacy import OutboundGuard, redact_cv
 
 
 def main() -> int:
+    use_utf8_output()
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )

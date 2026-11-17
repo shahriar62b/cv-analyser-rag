@@ -29,6 +29,7 @@ from pathlib import Path
 import numpy as np
 
 from cv_analyser.analysis import build_retriever
+from cv_analyser.console import use_utf8_output
 from cv_analyser.embedder import Embedder, SentenceTransformerEmbedder
 from cv_analyser.extraction import extract_requirements_llm
 from cv_analyser.job_description import load_job_description
@@ -47,6 +48,7 @@ COVERAGE_THRESHOLD = 0.6
 
 
 def main() -> int:
+    use_utf8_output()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--key", type=Path, default=Path("data/eval/answer_key.json"))
     parser.add_argument("--cv-dir", type=Path, default=Path("data/eval/cvs"))

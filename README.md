@@ -125,7 +125,11 @@ split into batches and continued later; the model is unloaded after each batch.
 Local models keep everything on your machine. Before a cloud model is used,
 `cv_analyser.privacy` removes the candidate's personal data:
 
-- the contact header, personal-information, references and declaration sections are dropped
+- only sections a job match can use are kept (summary, experience, education, skills,
+  projects, certifications, achievements, languages, volunteering, activities); the
+  contact header and everything else, such as personal information, references and
+  interests, are dropped
+- even then, only the CV excerpts retrieved for each requirement are sent, never the whole CV
 - emails, links, phone numbers and labelled fields (date of birth, NID, address...) are masked
 - the candidate's name is masked wherever it appears, in any case or script
 - every request then passes an outbound guard that blocks it if any known personal
@@ -136,6 +140,13 @@ Preview exactly what would be sent (nothing is sent by this command):
 ```bash
 python scripts/redact_cv.py path/to/cv.pdf
 python scripts/redact_cv.py path/to/cv.docx --mask "Hometown" --mask "Small Employer Ltd"
+```
+
+To see exactly what a cloud model received during a real analysis, save every
+request to a local file:
+
+```bash
+python scripts/analyse_cv.py cv.pdf job.txt --show-sent sent.txt
 ```
 
 Masking removes direct identifiers, not every indirect clue (a rare job title at a
