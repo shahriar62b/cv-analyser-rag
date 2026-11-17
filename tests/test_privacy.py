@@ -262,3 +262,59 @@ def test_private_client_masks_recruiter_contacts_in_the_job_ad_and_sends():
 
     assert cloud.sent == ["Apply to [EMAIL] or call [PHONE]"]
     assert client.model == "cloud"
+
+
+# --- Only the sections a job match can use leave the machine ---------------
+
+CV_MANY_SECTIONS = """Ayesha Siddiqua
+
+Contact Information
+Flat 4B, Example Tower, Chattogram
+
+Summary
+Marketing executive with 3 years of digital campaign experience.
+
+Experience
+Digital Marketing Executive, Example Foods (2023 - present)
+- Ran Facebook and Google ad campaigns with a monthly budget of BDT 5 lakh.
+
+Languages
+Bangla (native), English (fluent)
+
+Extracurricular Activities
+Led the university debate club and organised 2 national tournaments.
+
+Interests
+Quran recitation, volunteering at the local mosque, cricket
+
+Personal Information
+Marital Status: Married
+"""
+
+
+def test_only_sections_useful_for_matching_are_kept():
+    redacted = redact_cv(CV_MANY_SECTIONS).text
+
+    for kept in ("3 years of digital campaign", "BDT 5 lakh", "English (fluent)", "debate club"):
+        assert kept in redacted
+    for dropped in ("Chattogram", "Example Tower", "Quran", "mosque", "cricket", "Married"):
+        assert dropped not in redacted
+
+
+def test_every_kept_section_is_on_the_allowlist():
+    from cv_analyser.privacy.redactor import KEEP_SECTIONS
+    from cv_analyser.sections import split_into_sections
+
+    for case in PLANTED.values():
+        names = {section.name for section in split_into_sections(redact_cv(case[0]).text)}
+        assert names <= KEEP_SECTIONS | {"header"}
+
+
+def test_private_client_records_only_what_was_actually_sent():
+    cloud, local = _RecordingLLM(), _RecordingLLM()
+    client = PrivateLLMClient(cloud, OutboundGuard(IDENTITY), fallback=local)
+
+    client.generate_structured("system", "Built dashboards", CVSummary)
+    client.generate_structured("system", "Rahim built dashboards", CVSummary)  # blocked
+
+    assert client.sent == [("system", "Built dashboards")]

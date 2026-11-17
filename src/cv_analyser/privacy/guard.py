@@ -50,6 +50,9 @@ class PrivateLLMClient:
         self._guard = guard
         self._fallback = fallback
         self.blocked_requests = 0
+        # Every request that actually left the machine, kept in memory only, so
+        # the user can see exactly what a cloud model received.
+        self.sent: list[tuple[str, str]] = []
 
     @property
     def model(self) -> str:
@@ -59,6 +62,7 @@ class PrivateLLMClient:
         system, user = self._guard.scrub(system), self._guard.scrub(user)
         found = self._guard.leaks(system + "\n" + user)
         if not found:
+            self.sent.append((system, user))
             return self._inner.generate_structured(system, user, schema)
         self.blocked_requests += 1
         if self._fallback is None:

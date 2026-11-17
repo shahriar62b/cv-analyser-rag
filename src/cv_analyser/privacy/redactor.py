@@ -2,8 +2,9 @@
 
 Four layers, each covering gaps in the others:
 1. Find who the person is (name, emails, phones) while the CV is still intact.
-2. Drop whole parts that are never needed for matching: the contact header,
-   personal-information, references and declaration sections.
+2. Keep only the sections a job match can use (`KEEP_SECTIONS`); drop the
+   contact header and every other section, such as personal information,
+   references and interests.
 3. Mask anything with a personal-data shape: emails, links, phones, labelled
    fields like "Date of Birth: ...".
 4. Mask every remaining mention of the known name, in any case or line break.
@@ -27,8 +28,24 @@ from cv_analyser.privacy.patterns import (
 )
 from cv_analyser.sections import heading_name
 
-# Sections that only ever hold personal data.
-_DROP_SECTIONS = {"personal", "references", "declaration"}
+# Sections that can hold evidence for a job requirement. Everything else is
+# dropped: personal information, references, declaration and contact details
+# (only personal data), interests and hobbies (rarely evidence, and where
+# religion, politics or health tend to appear), and any section type added
+# later. An allowlist fails safe: a new kind of section is left out until
+# someone decides it is needed.
+KEEP_SECTIONS = {
+    "summary",
+    "experience",
+    "education",
+    "skills",
+    "projects",
+    "certifications",
+    "achievements",
+    "languages",
+    "volunteering",
+    "activities",
+}
 # Words that open a CV but are not a name.
 _NOT_A_NAME = {"curriculum vitae", "resume", "résumé", "cv", "bio data", "biodata", "bio-data"}
 # Header lines up to this many words are contact details or a title; longer
@@ -156,7 +173,7 @@ def _drop_personal_parts(lines: list[str]) -> tuple[list[str], list[str]]:
     for index, line in enumerate(lines):
         heading = heading_name(line)
         if heading is not None:
-            dropping = heading in _DROP_SECTIONS
+            dropping = heading not in KEEP_SECTIONS
         in_header = index < header_end and heading is None
         if dropping or (in_header and len(line.split()) <= _SHORT_LINE_WORDS):
             if line.strip():
