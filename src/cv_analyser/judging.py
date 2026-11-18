@@ -104,8 +104,10 @@ def _to_verdict(requirement: Requirement, judgement: _Judgement | None, cv_text:
         # The model quotes the closest line even when it is unrelated; don't show it.
         evidence, verified = "", True
     else:
-        evidence = _clean_quote(judgement.evidence)
-        verified = bool(evidence) and _normalise(evidence) in _normalise(cv_text)
+        pieces = _quote_pieces(judgement.evidence)
+        evidence = " | ".join(pieces)
+        cv = _normalise(cv_text)
+        verified = bool(pieces) and all(_normalise(piece) in cv for piece in pieces)
     return RequirementVerdict(
         requirement=requirement,
         status=judgement.status,
@@ -138,10 +140,28 @@ def _batch_prompt(
     return f"CV excerpts:\n{excerpts or '(none)'}\n\n" + "\n\n".join(requirement_lines)
 
 
-def _clean_quote(text: str) -> str:
-    # Models sometimes copy the "E3" excerpt number, "[section]" label or bullet
-    # marker from the prompt.
-    return re.sub(r"^(E\d+\s*)?(\[[a-z]+\]\s*)?([-*•]\s*)?", "", text.strip())
+# Where a model joins separate CV lines in one quote: an excerpt number copied
+# from the prompt (with its "[section]" label and a "-" or ":" after it), or an
+# ellipsis standing for the skipped text in between.
+_PIECE_BREAK = re.compile(r"\bE\d+\b(?:\s*\[[a-z ]+\])?\s*[-–:]?|\.\.\.|…")
+
+
+def _quote_pieces(text: str) -> list[str]:
+    """Split a quote into the CV lines it is made of.
+
+    The prompt numbers excerpts E1, E2, ... and small models copy those numbers
+    into quotes: "E1 [experience] - Built X", "Built X\\nE3 - Fixed Y", or just
+    ", E6". Each excerpt number, ellipsis and line break marks a new piece; numbers,
+    section labels and bullets are dropped, and pieces with no words are
+    discarded. The quote counts as verified only if every piece is in the CV.
+    """
+    pieces = []
+    for part in _PIECE_BREAK.split(text):
+        for line in part.splitlines():
+            piece = re.sub(r"^\s*(\[[a-z ]+\]\s*)?([-*•]\s*)?", "", line).strip(" \t,;")
+            if any(char.isalnum() for char in piece):
+                pieces.append(piece)
+    return pieces
 
 
 def _normalise(text: str) -> str:
