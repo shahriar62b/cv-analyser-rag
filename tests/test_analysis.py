@@ -119,6 +119,38 @@ def test_copied_excerpt_number_is_stripped_from_quotes(make_fake_llm, retriever)
     assert verdict.evidence == "Built REST APIs in Python"
 
 
+# Shapes qwen2.5:7b produced on the Kaggle eval run (2026-11-18).
+@pytest.mark.parametrize(
+    ("quote", "pieces"),
+    [
+        (
+            "Built REST APIs in Python\nE2 - Managed PostgreSQL databases",
+            "Built REST APIs in Python | Managed PostgreSQL databases",
+        ),
+        ("Python, Django, E1 - Built REST APIs in Python", "Python, Django | Built REST APIs in Python"),
+        ("Managed PostgreSQL databases, E2", "Managed PostgreSQL databases"),
+        # gpt-oss-120b joined a job title and a bullet with "...".
+        ("Experience ... Managed PostgreSQL databases", "Experience | Managed PostgreSQL databases"),
+    ],
+)
+def test_excerpt_numbers_inside_quotes_split_them_into_pieces(make_fake_llm, retriever, quote, pieces):
+    llm = make_fake_llm([{"judgements": [_judgement(1, evidence=quote)]}])
+
+    [verdict] = judge_requirements(llm, retriever, CV_TEXT, [Requirement(text="Python")])
+
+    assert verdict.evidence == pieces
+    assert verdict.evidence_verified is True
+
+
+@pytest.mark.parametrize("quote", [", E6", "Built REST APIs in Python\nE2 - Led a team of 10"])
+def test_quote_is_unverified_unless_every_piece_is_in_the_cv(make_fake_llm, retriever, quote):
+    llm = make_fake_llm([{"judgements": [_judgement(1, evidence=quote)]}])
+
+    [verdict] = judge_requirements(llm, retriever, CV_TEXT, [Requirement(text="Python")])
+
+    assert verdict.evidence_verified is False
+
+
 def test_judge_verifies_quoted_evidence(make_fake_llm, retriever):
     requirements = [Requirement(text="Python"), Requirement(text="Leadership")]
     llm = make_fake_llm(
