@@ -45,6 +45,10 @@ KEEP_SECTIONS = {
     "languages",
     "volunteering",
     "activities",
+    # Kept by the author's decision (2026-11-18): they often hold honours and
+    # memberships a job can ask for, and masking still runs on them.
+    "affiliations",
+    "additional",
 }
 # Words that open a CV but are not a name.
 _NOT_A_NAME = {"curriculum vitae", "resume", "résumé", "cv", "bio data", "biodata", "bio-data"}
