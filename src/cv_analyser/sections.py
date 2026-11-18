@@ -1,21 +1,88 @@
 from dataclasses import dataclass
 
 _HEADINGS = {
-    "summary": ("summary", "professional summary", "profile", "objective", "career objective"),
+    # Aliases marked "survey" were found in a scan of 2,484 real resumes
+    # (LiveCareer, Kaggle), counted by how many files used them.
+    "summary": (
+        "summary",
+        "professional summary",
+        "profile",
+        "objective",
+        "career objective",
+        "executive profile",  # survey: 131
+        "career overview",  # survey: 85
+        "professional profile",  # survey: 51
+        "career focus",  # survey: 48
+        "executive summary",  # survey: 36
+        "professional overview",  # survey: 16
+    ),
     "experience": (
         "experience",
         "work experience",
         "professional experience",
         "employment history",
         "work history",
+        "relevant experience",  # survey: 29
+        "military experience",  # survey: 27
     ),
-    "education": ("education", "academic background", "academic qualifications"),
-    "skills": ("skills", "technical skills", "key skills", "core competencies"),
+    "education": (
+        "education",
+        "academic background",
+        "academic qualifications",
+        "educational background",
+        "educational qualifications",
+        "education and training",  # survey: 508
+    ),
+    "skills": (
+        "skills",
+        "technical skills",
+        "key skills",
+        "core competencies",
+        "highlights",  # survey: 875, usually a skills list
+        "core qualifications",  # survey: 211
+        "skill highlights",  # survey: 187
+        "qualifications",  # survey: 102
+        "core strengths",  # survey: 36
+        "computer skills",  # survey: 27
+        "areas of expertise",
+        "additional skills",  # survey: 6
+        "summary of skills",  # survey: 34
+        "summary of qualifications",  # survey: 10
+        "technical skills and qualifications",  # survey: 10
+    ),
     "projects": ("projects", "personal projects", "academic projects"),
-    "certifications": ("certifications", "certificates", "licenses", "training"),
-    "achievements": ("achievements", "awards", "honors", "honours", "awards and achievements"),
+    "certifications": (
+        "certifications",
+        "certification",  # survey: 6
+        "certificates",
+        "licenses",
+        "training",
+        "professional development",  # survey: 9
+    ),
+    "achievements": (
+        "achievements",
+        "awards",
+        "honors",
+        "honours",
+        "awards and achievements",
+        "accomplishments",  # survey: 767
+        "core accomplishments",  # survey: 94
+        "publications",  # survey: 43
+        "presentations",  # survey: 43
+        "activities and honors",  # survey: 58
+    ),
     "languages": ("languages", "language skills"),
-    "volunteering": ("volunteer work", "volunteering", "volunteer experience"),
+    "volunteering": (
+        "volunteer work",
+        "volunteering",
+        "volunteer experience",
+        "volunteer",
+        "community service",
+    ),
+    "affiliations": ("affiliations", "professional affiliations", "memberships"),  # survey: 158, 211
+    # Usually honours, awards or extra skills; sometimes personal details, which
+    # the privacy masking still removes.
+    "additional": ("additional information", "additional details"),  # survey: 462
     "interests": ("interests", "hobbies", "hobbies and interests"),
     # Common in South Asian CVs; never needed for matching, and removed before
     # anything is sent to a cloud model (see privacy/).

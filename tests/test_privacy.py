@@ -172,6 +172,24 @@ def test_later_mentions_of_the_name_become_placeholders():
     assert "[NAME] automated the stock report" in redacted
 
 
+def test_additional_information_is_kept_but_still_masked():
+    text = """Nadia Karim
+nadia.karim@example.com
+
+Interests
+Chess
+
+Additional Information
+Dean's List 2019. References: nadia.karim@example.com
+"""
+
+    redacted = redact_cv(text).text
+
+    assert "Dean's List 2019" in redacted
+    assert "Chess" not in redacted
+    assert "nadia.karim@example.com" not in redacted
+
+
 def test_extra_terms_are_masked():
     redacted = redact_cv(CV_STANDARD, extra_terms=("Example Traders",)).text
 
