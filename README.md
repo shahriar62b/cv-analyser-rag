@@ -1,6 +1,6 @@
 ﻿# CV Analyser
 
-A RAG-based tool that compares a CV (PDF/DOCX) against a job description,
+A RAG-based tool that compares a CV (PDF, DOCX, or a scan or photo) against a job description,
 flags weaknesses, suggests improvements, and gives a verdict.
 
 Everything runs locally and for free: embeddings use sentence-transformers and
@@ -10,6 +10,8 @@ the LLM runs through [Ollama](https://ollama.com). No CV data leaves your machin
 Work in progress.
 
 - [x] Ingestion: load PDF/DOCX, clean text, split into sections and chunks
+- [x] OCR: scanned PDF pages and PNG/JPG CVs are read on your machine with
+      [RapidOCR](https://github.com/RapidAI/RapidOCR) (English; Bangla text is not supported)
 - [x] Retrieval: embed chunks and find CV evidence for each JD requirement
 - [x] LLM layer: provider-agnostic client with a local Ollama backend
 - [x] Analysis: LLM extracts requirements, judges each against CV evidence,

@@ -3,7 +3,7 @@ class CVAnalyserError(Exception):
 
 
 class UnsupportedFileTypeError(CVAnalyserError):
-    """The file extension is not supported (only PDF and DOCX)."""
+    """The file extension is not supported (only PDF, DOCX, PNG and JPG)."""
 
 
 class CorruptedFileError(CVAnalyserError):
@@ -11,7 +11,7 @@ class CorruptedFileError(CVAnalyserError):
 
 
 class EmptyDocumentError(CVAnalyserError):
-    """The file opened but no extractable text was found (e.g. scanned PDF)."""
+    """The file opened but no text was found, even with OCR (e.g. a blank page)."""
 
 
 class LLMError(CVAnalyserError):

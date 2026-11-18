@@ -9,9 +9,12 @@ description = "RAG-based CV vs job description analyser that runs on free, local
 requires-python = ">=3.11"
 dependencies = [
     "numpy>=2.0",
+    "onnxruntime>=1.20",
     "pdfplumber>=0.11",
+    "pillow>=10.1",
     "pydantic>=2.0",
     "python-docx>=1.1",
+    "rapidocr>=3.0",
     "sentence-transformers>=3.0",
 ]
 
@@ -25,7 +28,7 @@ where = ["src"]
 pythonpath = ["src"]
 addopts = "-m 'not slow and not ollama'"
 markers = [
-    "slow: tests that load the real embedding model (run with: pytest -m slow)",
+    "slow: tests that load real models (embedding, OCR) (run with: pytest -m slow)",
     "ollama: tests that call a running local Ollama server (run with: pytest -m ollama)",
 ]
 

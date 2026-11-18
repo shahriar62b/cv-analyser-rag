@@ -27,7 +27,7 @@ _STATUS_ICON = {"met": "[x]", "partial": "[~]", "missing": "[ ]"}
 def main() -> int:
     use_utf8_output()
     parser = argparse.ArgumentParser(description="Analyse a CV against a job description.")
-    parser.add_argument("cv", type=Path, help="CV file (PDF or DOCX)")
+    parser.add_argument("cv", type=Path, help="CV file (PDF, DOCX, PNG or JPG; scans are read with OCR)")
     parser.add_argument("jd", type=Path, help="Job description (TXT, PDF or DOCX)")
     parser.add_argument("--json", type=Path, help="Also save the full report as JSON here")
     parser.add_argument(
