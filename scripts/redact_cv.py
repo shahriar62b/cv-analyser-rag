@@ -24,7 +24,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("cv", type=Path, help="CV file (PDF or DOCX)")
+    parser.add_argument("cv", type=Path, help="CV file (PDF, DOCX, PNG or JPG; scans are read with OCR)")
     parser.add_argument(
         "--mask", action="append", default=[], help="Extra word or phrase to mask (can be repeated)"
     )
